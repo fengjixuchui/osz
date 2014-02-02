@@ -18,7 +18,7 @@ PATH_CATARC     = "#{PATH_OUTPUT}catarc"
 PATH_FDBOOT_IPL = "#{PATH_OUTPUT}fdboot.bin"
 PATH_OSZ2BOOT_BIN = "#{PATH_OUTPUT}osz2boot.bin"
 PATH_OSBIOS_BIN = "#{PATH_OUTPUT}oszbio.bin"
-PATH_OSBDOS_BIN = "#{PATH_OUTPUT}oszdos.bin"
+PATH_OSBSHELL_BIN = "#{PATH_OUTPUT}oszshell.bin"
 PATH_FAT12_BIN	= "#{PATH_OUTPUT}fat12.bin"
 PATH_OS_SYS 	= "#{PATH_OUTPUT}io32.sys"
 
@@ -101,14 +101,14 @@ namespace :osz do
 	FileList["extras/*"]
   ].flatten
 
-  [PATH_FDBOOT_IPL, PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_OSBDOS_BIN, PATH_FAT12_BIN, APPS].flatten.each do |bin|
+  [PATH_FDBOOT_IPL, PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_OSBSHELL_BIN, PATH_FAT12_BIN, APPS].flatten.each do |bin|
     src = PATH_SRC + File.basename(bin, ".bin") + ".asm"
     file bin => src do |t|
       sh "#{ AS } -f bin -o #{t.name} #{t.prerequisites.join(' ')}"
     end
   end
 
-  file PATH_OS_SYS => [PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_FAT12_BIN, PATH_OSBDOS_BIN] do |t|
+  file PATH_OS_SYS => [PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_FAT12_BIN, PATH_OSBSHELL_BIN] do |t|
     sh "cat #{t.prerequisites.join(' ')} > #{ t.name }"
   end
 

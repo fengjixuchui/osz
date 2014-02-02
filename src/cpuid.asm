@@ -34,14 +34,13 @@
 _main:
 	mov cl, OSZ_DOS_SYSINFO
 	call bp
-	mov [_osz_systbl], bx
-	mov [_osz_systbl+2], es
+	mov [_cpuid_family_id], cl
 
 	mov dx, _prefix_msg	
 	mov cl, OSZ_DOS_PUTS
 	call bp
 
-	mov al, [es:bx+OSZ_SYSTBL_CPUID]
+	mov al, [_cpuid_family_id]
 	cmp al, 0
 	jz .cpu8086
 	cmp al, 2
@@ -74,7 +73,7 @@ _main:
 	mov cl, OSZ_DOS_PUTS
 	call bp
 
-	mov al, [es:bx+OSZ_SYSTBL_CPUID]
+	mov al, [_cpuid_family_id]
 	cmp al, 5
 	jae short .has_cpuid_feature
 	jmp .no_cpuid_feature
@@ -415,7 +414,7 @@ _cpuid_feat_8c: ; 8000_0001_ECX
 	alignb 16
 _hex_tbl	db "0123456789abcdef"
 
-_osz_systbl		dd 0
+_cpuid_family_id	db 0
 
 _cpuid_string_buffer:
 	;times 256 db 0

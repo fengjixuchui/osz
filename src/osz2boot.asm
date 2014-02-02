@@ -29,8 +29,11 @@
 
 %include "osz.inc"
 
-%define	ORG_BASE			0x0C00
-%define	_osz_system_table	0x0800
+%define	VER_INTEGER		0x0001
+
+%define	ORG_BASE		0x0C00
+%define	_osz_systbl		0x0800
+
 
 [bits 16]
 [org ORG_BASE]
@@ -58,14 +61,22 @@ _crt:
 	mov di, ORG_BASE
 	mov cx,  (_END - _HEAD)/2
 	rep movsw
-	mov di, _osz_system_table
+	mov di, _osz_systbl
 	mov cx, OSZ_SYSTBL_SIZE/2
 	rep stosw
 		
 	pop ax
-	mov [es:_osz_system_table + OSZ_SYSTBL_ARCH], ax
+	mov [es:_osz_systbl + OSZ_SYSTBL_ARCH], ax
 	mov al, 0xEA
-	mov [es:_osz_system_table + OSZ_SYSTBL_CALLBIOS], al
+	mov [es:_osz_systbl + OSZ_SYSTBL_CALLBIOS], al
+
+	mov [es:_osz_systbl + OSZ_SYSTBL_IFS], word _dummy_IFS
+	mov [es:_osz_systbl + OSZ_SYSTBL_IFS+2], es
+	
+	mov [es:_osz_systbl + OSZ_SYSTBL_VERSION], word VER_INTEGER
+	
+	mov [es:0x00FC], word _int3F
+	mov [es:0x00FE], es
 	
 	mov ax, _next
 	push es
@@ -74,7 +85,7 @@ _crt:
 
 	; DETECT CPU
 _DETECT_CPUID:
-	mov di, _osz_system_table + OSZ_SYSTBL_CPUID
+	mov di, _osz_systbl + OSZ_SYSTBL_CPUID
 
 	mov dx,0xF000
 	pushf
@@ -174,6 +185,15 @@ _A20chk:
 	retf
 
 
+_int3F:
+	xor ax, ax
+	iret
+
+_dummy_IFS:
+	mov ax, -1
+	retf
+
+
 _next:
 	mov ax, ds
 	add ax, (_END-_HEAD)/16
@@ -198,7 +218,7 @@ _next:
 	mov ax, es	
 	push cs
 	pop es
-	mov bx, _osz_system_table
+	mov bx, _osz_systbl
 
 	push cs
 	call _invoke

@@ -293,6 +293,8 @@ crt:
 	mov [saved_imr+1], al
 
 	int 0x12
+	mov cl, 6
+	shl ax, cl
 	mov [es:bx + OSZ_SYSTBL_MEMSZ], ax
 	
 	;mov ax,0x0013

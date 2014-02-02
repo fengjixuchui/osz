@@ -50,8 +50,8 @@ _crt:
 	mov [_osz_systbl], bx
 	mov [_osz_systbl+2], es
 
-	mov [es:bx+OSZ_SYSTBL_NULL], word _fat12_ifs
-	mov [es:bx+OSZ_SYSTBL_NULL+2], cs
+	mov [es:bx+OSZ_SYSTBL_IFS], word _fat12_ifs
+	mov [es:bx+OSZ_SYSTBL_IFS+2], cs
 
 	call _fat12_init
 	
@@ -97,7 +97,7 @@ _scan_root:
 	add si, byte 31
 	loop .loop
 .end:
-	mov [_fat12_number_of_entries_of_root_dir_exists], dx
+	mov [_n_root_entries], dx
 
 	pop si
 	ret
@@ -129,7 +129,7 @@ _fat12_enum_file:
 	add si, _fat12_dir_buffer
 
 .loop:
-	cmp [_fat12_number_of_entries_of_root_dir_exists], bx
+	cmp [_n_root_entries], bx
 	jbe short .end_over
 	
 	mov al, [si]
@@ -145,6 +145,7 @@ _fat12_enum_file:
 
 	mov cx, 32
 	rep movsb
+	add di, byte 32
 	sub si, byte 32
 
 	jmp short .conv_filename
@@ -327,33 +328,7 @@ _lfn_conv_char:
 	ret
 
 .no_ascii:
-	cmp ax, 0x07FF
-	ja .utf_Ex
-	mov dx, ax
-	mov cl, 6
-	shr ax, cl
-	or al, 0xC0
-	stosb
-	and dl, 0x3F
-	mov al, 0x80
-	or al, dl
-	stosb
-	ret
-.utf_Ex:
-	mov dx, ax
-	mov cl, 12
-	shr ax, cl
-	or al, 0xE0
-	stosb
-	mov ax, dx
-	mov cl, 6
-	shr ax, cl
-	and al, 0x3F
-	or al, 0x80
-	stosb
-	mov al, dl
-	and al, 0x3F
-	or al, 0x80
+	mov al, '?'
 	stosb
 	ret
 
@@ -375,7 +350,7 @@ _fat12_open:
 	mov cx, ax
 	jcxz .nofile
 	
-	mov si, _dir_buff + 32
+	mov si, _dir_buff + 64
 	xor bx, bx
 .loop_cmp:
 	mov al, [si+bx]
@@ -410,8 +385,24 @@ _fat12_nop:
 	ret
 
 
+_fat12_get_cwd:
+	push ds
+	pop es
+	mov di, si
+	push cs
+	pop ds
+	mov si, _dummy_path
+	lodsb
+	mov cl, al
+	xor ch, ch
+	rep movsb
+	xor ax, ax
+	stosb
+	ret
+
+
 _fat12_read:
-	cmp si, [cs:_fat12_number_of_entries_of_root_dir_exists]
+	cmp si, [cs:_n_root_entries]
 	jb .valid_handle
 	mov ax, -1
 	ret
@@ -430,7 +421,6 @@ _fat12_read:
 	mov cl, 7
 	shl di, cl
 	or di, ax
-	
 	jz .end
 	or bx, bx
 	jz .end
@@ -449,9 +439,10 @@ _fat12_read:
 	
 	push cs
 	pop ds
+
+	mov ax, bx
 	
 .loop:
-	mov ax, bx
 	add ax, 14 + 19 - 2 ; culster to sector
 	
 	mov [si+8],ax
@@ -464,18 +455,29 @@ _fat12_read:
 	je .end
 
 	mov ax, bx
-	add ax, ax
-	add bx, ax
-	shr bx, 1
-	mov bx, [_fat12_fat_buffer + bx]
-	jnc .even
-	mov cl, 4
-	shr bx, cl
-.even:
-	and bx, 0x0FFF
+	call _fat12_next
+	mov bx, ax
 	jmp .loop
 	
 .end:
+	ret
+
+
+_fat12_next:
+	push bx
+	push cx
+	mov bx, ax
+	add ax, ax
+	add bx, ax
+	shr bx, 1
+	mov ax, [cs:_fat12_fat_buffer + bx]
+	jnc .even
+	mov cl, 4
+	shr ax, cl
+.even:
+	and ax, 0x0FFF
+	pop cx
+	pop bx
 	ret
 
 
@@ -508,10 +510,13 @@ _fat12_packet:
 	dd 0, 0
 
 
+_dummy_path	db 3, "//A"
 
-_fat12_number_of_entries_of_root_dir_exists	dw 0
+_n_root_entries	dw 0
 
 _IFS_func_tbl:
+	dw _fat12_get_cwd
+	dw _fat12_nop ; set cwd
 	dw _fat12_open
 	dw _fat12_nop; close
 	dw _fat12_read; read

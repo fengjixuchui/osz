@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Zero - DOS KERNEL and SHELL
+;;	MEG-OS Zero - Shell interface
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
@@ -30,7 +30,8 @@
 
 %include "osz.inc"
 
-%define	VER_INTEGER				0x0001
+
+%define	INT_DOS_VERSION	0x5005
 
 %define OSZ_BDOS	0x0005
 
@@ -38,15 +39,17 @@
 %define	MAX_CMD		127
 
 ;;	256
-%define	dir_buff	_BSS
+%define	str_buff	_BSS
 ;;	256
 %define	cmdline		_BSS + 0x0100
 ;;	128
 %define	cmd_buffer	_BSS + 0x0200
 ;;	128
 %define	arg_buffer	_BSS + 0x0280
+;;	256
+%define	dir_buff	_BSS + 0x0300
 ;;	16
-%define	numbuff		_BSS + 0x0300
+%define	numbuff		_BSS + 0x0400
 
 %define	_END		_BSS + 0x0400
 
@@ -74,6 +77,7 @@ _HEAD:
 	dw (_BSS-_HEAD)/16
 
 	jmp _crt
+
 
 	alignb 4
 _saved_sssp	dd 0
@@ -157,8 +161,6 @@ _BDOS_0C:
 _BDOS_0D:
 _BDOS_0E:
 _BDOS_0F:
-_BDOS_16:
-_BDOS_17:
 _BDOS_18:
 _BDOS_19:
 _BDOS_1A:
@@ -342,9 +344,14 @@ _BDOS_05:
 
 _BDOS_08: ; SYSINFO
 	les bx,[cs:_osz_systbl]
-	mov [bp+STK_BX], bx
-	mov [bp+STK_ES], es
-	mov ax, VER_INTEGER
+	mov ax, [es:bx + OSZ_SYSTBL_VERSION]
+	mov [bp+STK_BX], ax
+	mov cl, [es:bx + OSZ_SYSTBL_CPUID]
+	xor ch, ch
+	mov [bp+STK_CX], cx
+	xor dx, dx
+	mov [bp+STK_DX], dx
+	mov ax, INT_DOS_VERSION
 	ret
 
 
@@ -355,9 +362,10 @@ _BDOS_12:
 _BDOS_13:
 _BDOS_14:
 _BDOS_15:
+_BDOS_16:
+_BDOS_17:
 	les bx,[cs:_osz_systbl]
-	;les bx,[es:bx+OSZ_SYSTBL_NULL]
-	call far [es:bx+OSZ_SYSTBL_NULL]
+	call far [es:bx+OSZ_SYSTBL_IFS]
 	ret
 
 
@@ -385,15 +393,37 @@ _crt:
 
 	mov [_saved_sssp], sp
 	mov [_saved_sssp+2], ss
+
+%if 0
+	push es
+	mov dx, cs
+	les bx, [_osz_systbl]
+	call _disp_hex_16
+	mov al, ' '
+	call _fast_conout
+	mov dx, [es:bx+OSZ_SYSTBL_MEMSZ]
+	call _disp_hex_16
+	mov al, ' '
+	call _fast_conout
+	mov dx, [es:bx+OSZ_SYSTBL_LASTMEM]
+	call _disp_hex_16
+	mov al, 10
+	call _fast_conout
+	pop es
+%endif
 	
 	mov bp, sp
 	sub sp, SIZE_MAINSTACK
 
 	call _crlf
-	call _cmd_ver
+	;call _cmd_ver
 _loop:
-	mov al, 'A'
-	call _fast_conout
+	mov si, str_buff
+	mov cl, OSZ_DOS_GET_CWD
+	call _BDOS_entry
+	lea dx, [si+2]
+	mov cl, OSZ_DOS_PUTS
+	call _BDOS_entry
 	mov al, '>'
 	call _fast_conout
 
@@ -612,6 +642,9 @@ _cmd_echo:
 
 
 _cmd_cd:
+	mov dx,arg_buffer
+	mov cl, OSZ_DOS_SET_CWD
+	call _BDOS_entry
 	ret
 
 
@@ -625,7 +658,8 @@ _cmd_dir:
 	mov cl, OSZ_DOS_ENUM_FILE
 	call _BDOS_entry
 	or ax, ax
-	jz .end
+	jz short .end
+	js short .end
 	push ax
 
 	mov al, ' '
@@ -660,7 +694,7 @@ _cmd_dir:
 	call _fast_conout
 
 	mov cl, OSZ_DOS_PUTS	
-	mov dx, dir_buff + 32
+	mov dx, dir_buff + 64
 	call _BDOS_entry
 	
 	call _crlf
@@ -766,6 +800,8 @@ _strlen:
 	ret
 
 
+
+
 app_ext:
 	db ".bin",0
 
@@ -786,7 +822,7 @@ cmd_table:
 
 
 ver_msg:
-	db "OSZ ver 0.0.1.alpha", 10, 0
+	db "MEG-OS OSZ ver 0.0.1.alpha", 10, 0
 
 bad_cmd_msg:
 	db "Bad command or file name", 10, 0
