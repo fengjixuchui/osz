@@ -29,10 +29,10 @@
 
 %include "osz.inc"
 
-%define	VER_INTEGER		0x0001
+%define	VER_INTEGER		0x0002
 
-%define	ORG_BASE		0x0C00
-%define	_osz_systbl		0x0800
+%define	ORG_BASE		0x0800
+%define	_osz_systbl		0x0600
 
 
 [bits 16]
@@ -41,12 +41,66 @@
 _HEAD:
 	xor ax,0x1eaf
 	jz short _crt
-
 forever:
 	jmp short forever
 
-_crt:
+_int3F:
+	xor ax, ax
+	iret
 
+_dummy_IFS:
+	mov ax, -1
+	retf
+
+_next:
+	mov ax, ds
+	add ax, (_END-_HEAD)/16
+	mov ds, ax
+	mov dx, (ORG_BASE + _END_RESIDENT - _HEAD)/16
+	mov es, dx
+
+.load_loop:
+	push es
+	xor si, si
+	xor di, di
+	
+	mov cx, [si+0x02]
+	mov dx, ds
+	add dx, cx
+	push dx
+	add cx, cx
+	add cx, cx
+	add cx, cx
+	rep movsw
+
+	push es
+	push cs
+	pop es
+	pop ds
+	mov bx, _osz_systbl
+
+	push cs
+	call _invoke
+	
+	pop ds
+	pop bx
+	add bx, ax
+	mov es, bx
+	jmp short .load_loop
+
+_invoke:
+	mov cx, 0x0004
+	push ds
+	push cx
+	xor ax, ax
+	retf
+
+
+	alignb 16
+_END_RESIDENT:
+
+
+_crt:
 	cli
 	cld
 	mov es, ax
@@ -81,7 +135,6 @@ _crt:
 	mov ax, _next
 	push es
 	push ax
-	
 
 	; DETECT CPU
 _DETECT_CPUID:
@@ -99,7 +152,7 @@ _DETECT_CPUID:
 	and ax,dx
 	cmp ax,dx
 	jz short .end_cpu
-	
+
 	or cx,dx
 	push cx
 	popf
@@ -182,58 +235,6 @@ _A20chk:
 	pop ds
 %endif
 
-	retf
-
-
-_int3F:
-	xor ax, ax
-	iret
-
-_dummy_IFS:
-	mov ax, -1
-	retf
-
-
-_next:
-	mov ax, ds
-	add ax, (_END-_HEAD)/16
-	mov ds, ax
-	mov dx, (ORG_BASE + _END - _HEAD)/16
-	mov es, dx
-
-.load_loop:
-	push es
-	xor si, si
-	xor di, di
-	
-	mov cx, [si+0x02]
-	mov dx, ds
-	add dx, cx
-	push dx
-	add cx, cx
-	add cx, cx
-	add cx, cx
-	rep movsw
-
-	mov ax, es	
-	push cs
-	pop es
-	mov bx, _osz_systbl
-
-	push cs
-	call _invoke
-	
-	pop ds
-	pop bx
-	add bx, ax
-	mov es, bx
-	jmp short .load_loop
-
-_invoke:
-	mov ds, ax
-	mov cx, 0x0004
-	push ax
-	push cx
 	retf
 
 

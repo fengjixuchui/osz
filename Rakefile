@@ -1,8 +1,8 @@
 #! /usr/bin/rake
 # -*- coding: utf-8 -*-
 #
-# Rakefile for OS/Zero
-# Copyright(C)2014 ZOS project, ALL RIGHTS RESERVED.
+# Rakefile for MEG-OS Zero
+# Copyright(C)2014 MEG-OS project, ALL RIGHTS RESERVED.
 #
 require 'rake/clean'
 require 'rake/packagetask'
@@ -18,9 +18,11 @@ PATH_CATARC     = "#{PATH_OUTPUT}catarc"
 PATH_FDBOOT_IPL = "#{PATH_OUTPUT}fdboot.bin"
 PATH_OSZ2BOOT_BIN = "#{PATH_OUTPUT}osz2boot.bin"
 PATH_OSBIOS_BIN = "#{PATH_OUTPUT}oszbio.bin"
-PATH_OSBSHELL_BIN = "#{PATH_OUTPUT}oszshell.bin"
+PATH_OSBIO2_BIN = "#{PATH_OUTPUT}oszn98.bin"
+PATH_OSSHELL_BIN = "#{PATH_OUTPUT}oszshell.bin"
+PATH_OSIFS_BIN  = "#{PATH_OUTPUT}oszifs.bin"
 PATH_FAT12_BIN	= "#{PATH_OUTPUT}fat12.bin"
-PATH_OS_SYS 	= "#{PATH_OUTPUT}io32.sys"
+PATH_OS_SYS 	= "#{PATH_OUTPUT}osz.sys"
 
 
 CC              = "clang -Os"
@@ -70,6 +72,12 @@ task :cable3 => :default do
 end
 
 
+desc "Run with 8086run"
+task :run86 => :default do
+  sh "./8086run/8086run #{ PATH_BOOT_FLP }"
+end
+
+
 
 ####
 # tools
@@ -96,19 +104,17 @@ namespace :osz do
   
   EXTRAS = [
     "#{PATH_SRC}hello.asm",
-    "#{PATH_SRC}chars.asm",
-    "#{PATH_SRC}echo2.asm",
 	FileList["extras/*"]
   ].flatten
 
-  [PATH_FDBOOT_IPL, PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_OSBSHELL_BIN, PATH_FAT12_BIN, APPS].flatten.each do |bin|
+  [PATH_FDBOOT_IPL, PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_OSBIO2_BIN, PATH_OSSHELL_BIN, PATH_FAT12_BIN, APPS].flatten.each do |bin|
     src = PATH_SRC + File.basename(bin, ".bin") + ".asm"
     file bin => src do |t|
       sh "#{ AS } -f bin -o #{t.name} #{t.prerequisites.join(' ')}"
     end
   end
 
-  file PATH_OS_SYS => [PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_FAT12_BIN, PATH_OSBSHELL_BIN] do |t|
+  file PATH_OS_SYS => [PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_OSBIO2_BIN, PATH_FAT12_BIN, PATH_OSSHELL_BIN] do |t|
     sh "cat #{t.prerequisites.join(' ')} > #{ t.name }"
   end
 

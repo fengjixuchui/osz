@@ -50,6 +50,9 @@ _HEAD:
 	db "MEGOS      "
 	db "FAT12   "
 
+        ;;  FILENAMEEXT
+sysname db "OSZ     SYS"
+
 main:
 
 	;	setup register
@@ -264,14 +267,10 @@ forever:
 
 
 ;;  Variables
-cursor  dw 0, 0xA000
 fat2    dw 0
 _arch   db 0
 __PDA   db 0
 __N     db 0
-
-        ;;  FILENAMEEXT
-sysname db "IO32    SYS"
 
 	times 0x01FE-($-$$) db 0
 	db 0x55, 0xAA

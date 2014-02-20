@@ -31,9 +31,9 @@
 %include "osz.inc"
 
 
-%define	INT_DOS_VERSION	0x5005
+%define	INT_DOS_VERSION		0x3205
 
-%define OSZ_BDOS	0x0005
+%define OSZ_BDOS	0x000A
 
 %define	MAX_CMDLINE	127
 %define	MAX_CMD		127
@@ -171,8 +171,8 @@ _int00: ; INTEGER DIVIDE BY ZERO
 	push cs
 	pop ds
 	mov dx, int00_msg
-	mov ah, BIOS_PUTS
-	call _call_bios
+	mov cl, OSZ_DOS_PUTS
+	call _BDOS_entry
 	;jmp _BDOS_00
 
 _BDOS_00: ; EXIT
@@ -196,8 +196,10 @@ _psp_bdos:
 
 _crlf:
 	mov al, 10
-_fast_conout:
-	mov ah, BIOS_CONOUT
+	int 0x29
+	ret
+
+
 _call_bios:
 	db 0x9A
 _osz_systbl	dd 0
@@ -209,22 +211,32 @@ _BDOS_01:
 	mov ah, BIOS_CONIN
 	jmp short _call_bios
 
+
 	; CONOUT
 _BDOS_02:
 	mov al, dl
-	jmp short _fast_conout
+	int 0x29
 	ret
+
 
 	; CONST
 _BDOS_03:
 	mov ah, BIOS_CONST
 	jmp short _call_bios
 
+
 	; CONOUT STRING
 _BDOS_04:
-	mov ah, BIOS_PUTS
-	call _call_bios
+	mov si, dx
+.loop:
+	lodsb
+	or al,al
+	jz short .end
+	int 0x29
+	jmp short .loop
+.end:
 	ret
+
 
 	; CONIN BUFFERED
 	; IN ax = limit ds:dx = buffer
@@ -243,8 +255,7 @@ _BDOS_05:
 	call _call_bios
 	or al,al
 	jnz .has_key
-	sti
-	hlt
+	int 0x28
 	jmp short .main_loop
 
 .has_key:
@@ -255,9 +266,9 @@ _BDOS_05:
 	jnz short .no_break
 
 	mov al, '^'
-	call _fast_conout
+	int 0x29
 	mov al, 'C'
-	call _fast_conout
+	int 0x29
 
 	jmp short _BDOS_00
 	;xor bx,bx
@@ -265,9 +276,9 @@ _BDOS_05:
 	
 .no_break:
 
-	cmp al, 0x0D
+	cmp al, 0x0D ; cr
 	jz short .crlf
-	cmp al, 0x0A
+	cmp al, 0x0A ; lf
 	jnz short .no_crlf
 
 .crlf:
@@ -287,30 +298,33 @@ _BDOS_05:
 	dec bx
 	
 	mov al, 8
-	call _fast_conout
+	int 0x29
 	mov al, ' '
-	call _fast_conout
+	int 0x29
 	mov al, 8
-	call _fast_conout
+	int 0x29
 	
 	jmp short .loop_esc
 
 .no_esc:
 
-	cmp al, 0x08
+	cmp al, 0x08 ; ascii backspace
+	jz short .backspace
+	cmp al, 0x7F ; some unicses standard backspace
 	jnz short .no_bs
-	
+
+.backspace:
 	or bx, bx
 	jz short .main_loop
 	
 	dec bx
 	
 	mov al, 8
-	call _fast_conout
+	int 0x29
 	mov al, ' '
-	call _fast_conout
+	int 0x29
 	mov al, 8
-	call _fast_conout
+	int 0x29
 	
 	jmp short .main_loop
 
@@ -321,8 +335,7 @@ _BDOS_05:
 
 	mov [si+bx], al
 	inc bx
-	
-	call _fast_conout
+	int 0x29
 
 	jmp short .main_loop
 
@@ -347,7 +360,7 @@ _BDOS_08: ; SYSINFO
 	mov ax, [es:bx + OSZ_SYSTBL_VERSION]
 	mov [bp+STK_BX], ax
 	mov cl, [es:bx + OSZ_SYSTBL_CPUID]
-	xor ch, ch
+	mov ch, [es:bx + OSZ_SYSTBL_ARCH]
 	mov [bp+STK_CX], cx
 	xor dx, dx
 	mov [bp+STK_DX], dx
@@ -376,7 +389,7 @@ _crt:
 	mov [_osz_systbl+2], es
 
 	mov ax, cs
-	add ax, (_END)
+	add ax, (_END-_HEAD)/16
 	mov [es:bx+OSZ_SYSTBL_LASTMEM], ax
 	
 	xor bx, bx
@@ -394,29 +407,11 @@ _crt:
 	mov [_saved_sssp], sp
 	mov [_saved_sssp+2], ss
 
-%if 0
-	push es
-	mov dx, cs
-	les bx, [_osz_systbl]
-	call _disp_hex_16
-	mov al, ' '
-	call _fast_conout
-	mov dx, [es:bx+OSZ_SYSTBL_MEMSZ]
-	call _disp_hex_16
-	mov al, ' '
-	call _fast_conout
-	mov dx, [es:bx+OSZ_SYSTBL_LASTMEM]
-	call _disp_hex_16
-	mov al, 10
-	call _fast_conout
-	pop es
-%endif
-	
 	mov bp, sp
 	sub sp, SIZE_MAINSTACK
 
-	call _crlf
-	;call _cmd_ver
+	call _cmd_ver
+	call _cmd_mem
 _loop:
 	mov si, str_buff
 	mov cl, OSZ_DOS_GET_CWD
@@ -425,7 +420,7 @@ _loop:
 	mov cl, OSZ_DOS_PUTS
 	call _BDOS_entry
 	mov al, '>'
-	call _fast_conout
+	int 0x29
 
 	mov ax, MAX_CMDLINE
 	mov cl, OSZ_DOS_GETS
@@ -571,6 +566,12 @@ _loop:
 	stosw
 	mov ax, cs
 	stosw
+	
+	mov ax, 0xFFFF
+	stosb
+	stosw
+	stosw
+	
 	mov al, 0x9A
 	stosb
 	mov ax, _psp_bdos
@@ -648,10 +649,105 @@ _cmd_cd:
 	ret
 
 
-_cmd_dir:
-	push cs
-	pop es
+_cmd_cls:
+	mov ah, BIOS_CLS
+	call _call_bios
+	ret
 
+
+_cmd_mem:
+	push es
+	les bx, [_osz_systbl]
+
+	mov dx, mem_lower_msg
+	mov cl, OSZ_DOS_PUTS
+	call _BDOS_entry
+	mov dx, [es:bx+OSZ_SYSTBL_MEMSZ]
+	mov cl, 6
+	shr dx, cl
+	call _disp_dec
+	mov dx, mem_kb_msg
+	mov cl, OSZ_DOS_PUTS
+	call _BDOS_entry
+
+	mov dx, mem_free_msg
+	mov cl, OSZ_DOS_PUTS
+	call _BDOS_entry
+	mov dx, [es:bx+OSZ_SYSTBL_MEMSZ]
+	sub dx, [es:bx+OSZ_SYSTBL_LASTMEM]
+	mov cl, 6
+	shr dx, cl
+	call _disp_dec
+	mov dx, mem_kb_msg
+	mov cl, OSZ_DOS_PUTS
+	call _BDOS_entry
+
+	mov ax, [es:bx+OSZ_SYSTBL_MEMPROT]
+	or ax, ax
+	jz .no_protmem
+	mov dx, mem_prot_msg
+	mov cl, OSZ_DOS_PUTS
+	call _BDOS_entry
+	mov dx, [es:bx+OSZ_SYSTBL_MEMPROT]
+	call _disp_dec
+	mov dx, mem_kb_msg
+	mov cl, OSZ_DOS_PUTS
+	call _BDOS_entry
+.no_protmem:
+
+	pop es
+	ret
+
+
+_disp_dec:
+	push es
+	push ds
+	pop es
+	push cx
+	push bx
+	push di
+	
+	mov di,numbuff
+	mov ax, 0x2020
+	stosw
+	stosw
+	xor ah, ah
+	stosw
+	mov ax, dx
+	xor dx, dx
+	mov cx, 10
+	lea bx, [di-2]
+.loop_sz:
+	div cx
+	add dl, '0'
+	mov [bx], dl
+	dec bx
+	jz .end_sz
+	or ax, ax
+	jz .end_sz
+	xor dx, dx
+	jmp short .loop_sz
+.end_sz:
+	mov cl, OSZ_DOS_PUTS
+	mov dx, numbuff
+	call _BDOS_entry
+	
+	pop di
+	pop bx
+	pop cx
+	pop es
+	ret
+
+
+mem_lower_msg	db "Lower Mem: ", 0
+mem_free_msg	db " Free Mem: ", 0
+mem_prot_msg	db " Extended: ", 0
+mem_kb_msg		db " KB", 10, 0
+
+
+
+
+_cmd_dir:
 	xor ax, ax
 .loop:
 	mov dx, dir_buff
@@ -663,7 +759,7 @@ _cmd_dir:
 	push ax
 
 	mov al, ' '
-	call _fast_conout
+	int 0x29
 
 	mov cx, 4
 	mov di,numbuff
@@ -691,7 +787,7 @@ _cmd_dir:
 	call _BDOS_entry
 
 	mov al, ' '
-	call _fast_conout
+	int 0x29
 
 	mov cl, OSZ_DOS_PUTS	
 	mov dx, dir_buff + 64
@@ -754,7 +850,7 @@ _cmd_type:
 	ret
 
 
-%if 0
+%if 1
 _disp_hex_16:
 	mov cl, 4
 	jmp short _disp_hex
@@ -772,7 +868,7 @@ _disp_hex:
 	mov bx, dx
 	and bx, byte 0x000F
 	mov al, [_hex_tbl+bx]
-	call _fast_conout
+	int 0x29
 	pop cx
 	loop .loop
 	pop bx
@@ -808,21 +904,25 @@ app_ext:
 cmd_table:
 	db 2,"cd"
 	dw _cmd_cd
-	db 3,"ver"
-	dw _cmd_ver
+	db 3,"cls"
+	dw _cmd_cls
 	db 3,"dir"
 	dw _cmd_dir
-	db 4,"type"
-	dw _cmd_type
+	db 3,"mem"
+	dw _cmd_mem
+	db 3,"ver"
+	dw _cmd_ver
 	db 4,"echo"
 	dw _cmd_echo
 	db 4,"exit"
 	dw _cmd_exit
+	db 4,"type"
+	dw _cmd_type
 	db 0
 
 
 ver_msg:
-	db "MEG-OS OSZ ver 0.0.1.alpha", 10, 0
+	db "MEG-OS Z ver 0.0.2", 10, 0
 
 bad_cmd_msg:
 	db "Bad command or file name", 10, 0
@@ -830,7 +930,8 @@ bad_cmd_msg:
 nofile_msg:
 	db "No such file or directory", 10, 0
 
-int00_msg	db "#DIV/0!", 10, 0
+int00_msg	db 10, "#DIV/0!", 10, 0
+
 
 	alignb 16
 _BSS:

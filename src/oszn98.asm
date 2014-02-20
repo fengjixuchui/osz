@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Zero - BIOS for IBM PC
+;;	MEG-OS Zero - BIOS for NEC PC-9800 Series Personal Computer
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
@@ -41,9 +41,9 @@ _HEAD:
 	alignb 2
 saved_imr	dw 0
 
-lba_enabled	db 0
+cons_cursor	dw 0, 0xA000
+cons_scroll	dw 160*24
 
-	alignb 2
 _bios_table:
 	dw _bios_const
 	dw _bios_conin
@@ -103,7 +103,8 @@ _retf:
 
 _bios_const:
 	mov ah, 0x01
-	int 0x16
+	int 0x18
+	or bh, bh
 	jz short .empty
 	mov al, 0xFF
 	ret
@@ -115,19 +116,24 @@ _bios_const:
 _bios_conin:
 .loop:
 	mov ah,0x01
-	int 0x16
+	int 0x18
+	or bh, bh
 	jz short .wait
 	xor ah, ah
-	int 0x16
+	int 0x18
 	xor ah, ah
 	ret
 .wait:
-	int 0x28
+	sti
+	hlt
 	jmp short .loop
-	
-	
+
+
 _bios_conout:
-	mov bx, 0x0007
+	les di, [cs:cons_cursor]
+	call _check_scroll
+	cmp al, 0x08
+	jz short .bs
 	cmp al, 0x0A
 	jz short .crlf
 	cmp al, 0x7F
@@ -136,89 +142,127 @@ _bios_conout:
 	jb short .end
 	mov al, '?'
 .ascii:
-	mov ah, 0x0E
-	int 0x10
+	cmp al, 0x5C
+	jnz .no_5C
+	mov al, 0xFC
+.no_5C:
+	xor ah, ah
+	stosw
+	jmp short .end
+.bs:
+	mov ax, di
+	mov cx, 160
+	cwd
+	div cx
+	mov bx, dx
+	mul cx
+	or bx, bx
+	jz .bs_leftend
+	dec bx
+	dec bx
+.bs_leftend:
+	add ax, bx
+	mov di, ax
 	jmp short .end
 .crlf:
-	mov ax,0x0E0D
-	int 0x10
-	mov ax,0x0E0A
-	int 0x10
+	mov ax, di
+	mov cx, 160
+	cwd
+	div cx
+	inc ax
+	mul cx
+	mov di, ax
 .end:
+	mov [cs:cons_cursor], di
+	mov dx, di
+	mov ah, 0x13
+	int 0x18
+	ret
+
+
+_check_scroll:
+	cmp di, [cs:cons_scroll]
+	jae short .do
+	ret
+.do:
+	push ax
+	push ds
+	push es
+	pop ds
+	mov si, 160
+	xor di, di
+	mov cx, [cs:cons_scroll]
+	sub cx, si
+	shr cx, 1
+	rep movsw
+	mov ax, 0x0020
+	mov cx, 80
+	rep stosw
+	pop ds
+	pop ax
+	sub di, 160
 	ret
 
 
 _bios_cls:
-	mov ah, 0x0F
-	int 0x10
-	xor ah, ah
-	int 0x10
-	xor bx, bx
+	mov dx, 0x0E120
+	mov ah, 0x16
+	int 0x18
 	xor dx, dx
-	mov ah, 0x02
-	int 0x10
+	mov [cs:cons_cursor], dx
+	mov ah, 0x13
+	int 0x18
+	mov ah, 0x11
+	int 0x18
 	ret
 
 
 _bios_power:
-
-	; exit cable3 (8086tiny http://www.megalith.co.uk/8086tiny/)
-	xor bx, bx
-	mov ds, bx
-	mov [bx], byte 0xCB
 	push cs
-	call _exit_cable3
-	
-	; APM shutdown
-	mov ax, 0x5301
-	xor bx, bx
-	int 0x15
-	
-	mov ax, 0x530E
-	xor bx, bx
-	mov cx, 0x0102
-	int 0x15
-	
-	mov ax, 0x5307
-	mov bx, 0x0001
-	mov cx, 0x0003
-	int 0x15
-	
-	; then reboot
-	;mov al, 0xFF
-	;out 0x21, al
-	;out 0xA1, al
-	cli
-	mov al, 0xFE
-	out 0x64 ,al
-	mov al, 0x01
-	out 0x92, al
-	
-	int 0x19
-_forever:
-	hlt
-	jmp _forever
+	pop ds
 
-_exit_cable3:
-	push bx
-	push bx
-	retf
+	; np2 shutdown
+	mov si, np2_shutdown_cmd
+	mov dx, 0x07EF
+.loop_np2:
+	lodsb
+	or al, al
+	jz short .end_np2
+	out dx, al
+	jmp short .loop_np2
+.end_np2:
+
+	;;	TODO: APM Shutdown
+
+	;;	REBOOT
+	mov al, 0x0F
+	out 0x37, al
+	mov al, 0x0B
+	out 0x37, al
+	xor al, al
+	out 0xF0, al
+
+forever:
+	hlt
+	jmp forever
+
 
 
 _bios_dispose:
 	cli
 	mov al, [cs:saved_imr]
-	out 0x21, al
+	out 0x02, al
 	mov al, [cs:saved_imr+1]
-	out 0xA1, al
+	out 0x0A, al
 	;; TODO:
 	ret
 
 
 _bios_init_disk:
-	xor ax,ax
-	xor dx,dx
-	int 0x13
+	mov ax, 0x0330
+	int 0x1B
+	mov ax, 0x0730
+	int 0x1B
 	ret
 
 
@@ -226,22 +270,25 @@ _bios_fd_read:
 	xor di,di
 	
 	mov ax,[si+0x08]
-	les bx,[si+0x04]
+	les bp,[si+0x04]
 	mov cx,[si+0x02]
 .loop:	
 	push ax
 	push cx
+	
 	mov cl, 18
 	div cl
-	mov cl, ah
-	mov ch, al
+	mov dl, ah
 	xor dh, dh
-	shr ch, 1
-	adc dh, dh
-	inc cl
-	mov dl, 0x00
-	mov ax, 0x0201
-	int 0x13
+	inc dx
+	mov cl, al
+	shr cl, 1
+	adc dh, 0
+	mov ch, 0x02
+	mov bx, 0x0200
+	mov ax, 0x5630
+	int 0x1B
+	
 	pop cx
 	pop ax
 	jc short .end
@@ -265,13 +312,15 @@ _bios_fd_write:
 	ret
 
 
+np2_shutdown_cmd db "poweroff", 0
+
 	alignb 16
 _END_RESIDENT:
 
 
 crt:
 	mov al, [es:bx + OSZ_SYSTBL_ARCH]
-	cmp al, 0x01
+	or al, al
 	jnz .dont_install
 	mov ax, [es:bx + OSZ_SYSTBL_BIOS]
 	or ax, [es:bx + OSZ_SYSTBL_BIOS+2]
@@ -282,16 +331,14 @@ crt:
 .install_ok:
 
 	; setup
-	;mov [_osz_systbl], bx
-	;mov [_osz_systbl+2], es
 	mov [es:bx + OSZ_SYSTBL_BIOS], word _bios_entry
 	mov [es:bx + OSZ_SYSTBL_BIOS+2], cs
 
-	in al, 0x21
+	in al, 0x02
 	mov [saved_imr], al
-	in al, 0xA1
+	in al, 0x0A
 	mov [saved_imr+1], al
-	
+
 	mov di, 0x28*4
 	mov ax, __int28
 	stosw
@@ -302,39 +349,58 @@ crt:
 	mov ax, cs
 	stosw
 
-	int 0x12
-	mov cl, 6
+	mov al, [es:0x0501]
+	and ax, byte 0x07
+	inc ax
+	mov cl, 13
 	shl ax, cl
 	mov [es:bx + OSZ_SYSTBL_MEMSZ], ax
-
+	
 	cmp [es:bx + OSZ_SYSTBL_CPUID], byte 2
 	jb .no_extmem
-	mov ah, 0x88
-	int 0x15
-	jc .no_extmem
+	mov al, [es:0x0401]
+	xor ah, ah
+	mov cl, 7
+	shl ax, cl
 	mov [es:bx + OSZ_SYSTBL_MEMPROT], ax
 .no_extmem:
 
-	mov dl, 0x80
-	mov bx, 0x55AA
-	mov ah, 0x41
-	int 0x13
-	jc .no_lba
-	cmp bx, 0xAA55
-	jnz .no_lba
-	test cx, 0x01
-	jz .no_lba
-	mov [lba_enabled], bl
-.no_lba:
+	;;  SETUP 640x480
+	mov al, [es:0x045C]
+	test al, 0x40
+	jz short .no_pegc
 
-	mov al, 13
-	call _bios_conout
+	mov ax, 0x300C
+	mov bx, 0x3200
+	int 0x18
+	mov ax, 0x4D00
+	mov cx, 0x0100
+	int 0x18
+	mov ah, 0x0C
+	int 0x18
+	mov ah, 0x40
+	int 0x18
+
+	mov cx, 0xE000
+	mov es, cx
+	mov ax,0x0001
+	mov [es:0x0100],al
+	mov [es:0x0102],ax
+	
+	mov [cons_scroll], word 160*29
+
+.no_pegc:
+
+	call _bios_cls
 
 	call _bios_init_disk
 	
 	mov ax, (_END_RESIDENT-_HEAD)/16
 	retf
-	
 
 	alignb 16
 _END:
+
+
+
+

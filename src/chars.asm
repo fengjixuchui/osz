@@ -2,11 +2,9 @@
 %include "osz.inc"
 [bits 16]
 [org 0x0100]
-	mov dl, ' '
+	mov al, ' '
 _loop:
-	mov cl, OSZ_DOS_CONOUT
-	call bp
-	inc dx
-	cmp dl, 0x7F
-	jb _loop
+	int 0x29
+	inc al
+	jns _loop
 	ret

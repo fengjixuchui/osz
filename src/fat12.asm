@@ -29,14 +29,14 @@
 
 %include "osz.inc"
 
-;;	MAX 6KB
+;;	MAX 4.5KB
 %define	_fat12_fat_buffer	(_END)
 ;;	MAX 8KB
-%define	_fat12_dir_buffer	(_END+0x1800)
+%define	_fat12_dir_buffer	(_END+0x1200)
 ;;	MAX 256B
-%define	_dir_buff			(_END+0x3800)
+%define	_dir_buff			(_END+0x3200)
 
-%define	SIZE_BSS			0x3900
+%define	SIZE_BSS			0x3300
 
 %define	MAX_FILENAME		64
 
@@ -133,9 +133,11 @@ _fat12_enum_file:
 	jbe short .end_over
 	
 	mov al, [si]
-	or al, al
+	or al, al ; end of dir
 	jz short .end_over
-	cmp al, 0xE5
+	cmp al, 0xE5 ; deleted file
+	jz short .skip
+	cmp al, 0x2E ; special dotted dir (./..)
 	jz short .skip
 	mov dl, [si+0x0B]
 	test dl, 0x08
