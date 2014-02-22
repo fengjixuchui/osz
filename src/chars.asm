@@ -1,5 +1,4 @@
-; Chars for OSZ
-%include "osz.inc"
+; Chars for OSZ/DOS
 [bits 16]
 [org 0x0100]
 	mov al, ' '

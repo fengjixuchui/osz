@@ -124,8 +124,7 @@ _bios_conin:
 	xor ah, ah
 	ret
 .wait:
-	sti
-	hlt
+	int 0x28
 	jmp short .loop
 
 
@@ -136,6 +135,8 @@ _bios_conout:
 	jz short .bs
 	cmp al, 0x0A
 	jz short .crlf
+	cmp al, 0x0D
+	jz short .cr
 	cmp al, 0x7F
 	jbe short .ascii
 	cmp al, 0xC0
@@ -164,6 +165,14 @@ _bios_conout:
 	add ax, bx
 	mov di, ax
 	jmp short .end
+.cr:
+	mov ax, di
+	mov cx, 160
+	cwd
+	div cx
+	mul cx
+	mov di, ax
+	jmp short .end
 .crlf:
 	mov ax, di
 	mov cx, 160
@@ -172,6 +181,7 @@ _bios_conout:
 	inc ax
 	mul cx
 	mov di, ax
+	;jmp short .end
 .end:
 	mov [cs:cons_cursor], di
 	mov dx, di

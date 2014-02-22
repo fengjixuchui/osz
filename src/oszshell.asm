@@ -53,12 +53,6 @@
 
 %define	_END		_BSS + 0x0400
 
-%define	SIZE_MAINSTACK	16
-%define	LOCAL_SAVED_HANDLE		-2
-%define	LOCAL_SIZE_CMDLINE		-4
-%define	LOCAL_SIZE_CMD			-6
-%define	LOCAL_SIZE_ARG			-8
-
 %define	STK_AX					0
 %define	STK_CX					2
 %define	STK_DX					4
@@ -68,6 +62,9 @@
 %define	STK_BP					12
 %define	STK_DS					14
 %define	STK_ES					16
+%define	STK_IP					18
+%define	STK_CS					20
+%define	STK_FLAGS				22
 
 
 [bits 16]
@@ -83,35 +80,51 @@ _HEAD:
 _saved_sssp	dd 0
 
 _BDOS_function_table:
-	dw _BDOS_00-_HEAD
-	dw _BDOS_01-_HEAD
-	dw _BDOS_02-_HEAD
-	dw _BDOS_03-_HEAD
-	dw _BDOS_04-_HEAD
-	dw _BDOS_05-_HEAD
-	dw _BDOS_06-_HEAD
-	dw _BDOS_07-_HEAD
-	dw _BDOS_08-_HEAD
-	dw _BDOS_09-_HEAD
-	dw _BDOS_0A-_HEAD
-	dw _BDOS_0B-_HEAD
-	dw _BDOS_0C-_HEAD
-	dw _BDOS_0D-_HEAD
-	dw _BDOS_0E-_HEAD
-	dw _BDOS_0F-_HEAD
-	dw _BDOS_10-_HEAD
-	dw _BDOS_11-_HEAD
-	dw _BDOS_12-_HEAD
-	dw _BDOS_13-_HEAD
-	dw _BDOS_14-_HEAD
-	dw _BDOS_15-_HEAD
-	dw _BDOS_16-_HEAD
-	dw _BDOS_17-_HEAD
-	dw _BDOS_18-_HEAD
-	dw _BDOS_19-_HEAD
-	dw _BDOS_1A-_HEAD
+	dw _BDOS_00
+	dw _BDOS_01
+	dw _BDOS_02
+	dw _BDOS_03
+	dw _BDOS_04
+	dw _BDOS_05
+	dw _BDOS_06
+	dw _BDOS_07
+	dw _BDOS_08
+	dw _BDOS_09
+	dw _BDOS_0A
+	dw _BDOS_0B
+	dw _BDOS_0C
+	dw _BDOS_0D
+	dw _BDOS_0E
+	dw _BDOS_0F
+	dw _BDOS_10
+	dw _BDOS_11
+	dw _BDOS_12
+	dw _BDOS_13
+	dw _BDOS_14
+	dw _BDOS_15
+	dw _BDOS_16
+	dw _BDOS_17
+	dw _BDOS_18
+	dw _BDOS_19
+	dw _BDOS_1A
 	dw _BDOS_unknown-_HEAD
 _END_BDOS_function:
+
+int21_function_table:
+	dw _BDOS_00
+	dw int21_01
+	dw int21_02
+	dw int21_03
+	dw int21_04
+	dw int21_05
+	dw int21_06
+	dw int21_07
+	dw int21_08
+	dw int21_09
+	dw int21_0A
+	dw int21_0B
+	dw int21_0C
+end_int21_function:
 
 
 _BDOS_over:
@@ -133,7 +146,7 @@ _BDOS_entry:
 	mov bp,sp
 
 	mov bl, cl
-	mov bh, 0x00
+	xor bh, bh
 	add bx, bx
 	call [cs:_BDOS_function_table + bx]
 
@@ -148,6 +161,54 @@ _BDOS_return:
 	pop ds
 	pop es
 	ret
+
+
+_int21_over:
+	mov al, 0xFF
+	iret
+
+_int21:
+	cmp ah, (end_int21_function-int21_function_table)/2
+	jae short _int21_over
+	push es
+	push ds
+	push bp
+	push di
+	push si
+	push bx
+	push dx
+	push cx
+	push ax
+	mov bp,sp
+
+	mov bl, ah
+	xor bh, bh
+	add bx, bx
+	call [cs:int21_function_table + bx]
+
+	lea sp,[bp+2]
+	pop cx
+	pop dx
+	pop bx
+	pop si
+	pop di
+	pop bp
+	pop ds
+	pop es
+_int_nop:
+	iret
+
+
+int21_03:
+int21_04:
+int21_05:
+	ret
+
+
+_int2526: ; DOS1+ ABSOLUTE DISK I/O (DUMMY)
+	mov ax, 0x0207
+	stc
+	retf 2
 
 
 	; DEFAULT BDOS FUNCTION
@@ -167,27 +228,6 @@ _BDOS_1A:
 	mov ax, 0xFFFF
 	ret
 
-_int00: ; INTEGER DIVIDE BY ZERO
-	push cs
-	pop ds
-	mov dx, int00_msg
-	mov cl, OSZ_DOS_PUTS
-	call _BDOS_entry
-	;jmp _BDOS_00
-
-_BDOS_00: ; EXIT
-	mov cx, cs
-	mov ds, cx
-	mov es, cx
-	cli
-	cld
-	mov ss,[_saved_sssp+2]
-	mov sp,[_saved_sssp]
-	mov bp, sp
-	sub sp, SIZE_MAINSTACK
-	call _crlf
-	jmp _loop
-
 
 _psp_bdos:
 	call _BDOS_entry
@@ -206,36 +246,39 @@ _osz_systbl	dd 0
 	ret
 
 
+	; CONIN WITH ECHO
+int21_01:
+	call _BDOS_01
+	int 0x29
+	ret
+
 	; CONIN
+int21_07:
+int21_08:
 _BDOS_01:
 	mov ah, BIOS_CONIN
 	jmp short _call_bios
 
 
 	; CONOUT
+int21_02:
 _BDOS_02:
 	mov al, dl
 	int 0x29
 	ret
 
+	; DIRECT CONSOLE IO
+int21_06:
+	cmp dl, 0xFF
+	jnz _BDOS_02
+	; TODO: NOT SUPPORTED
+	xor al, al
+	ret
 
 	; CONST
 _BDOS_03:
 	mov ah, BIOS_CONST
 	jmp short _call_bios
-
-
-	; CONOUT STRING
-_BDOS_04:
-	mov si, dx
-.loop:
-	lodsb
-	or al,al
-	jz short .end
-	int 0x29
-	jmp short .loop
-.end:
-	ret
 
 
 	; CONIN BUFFERED
@@ -270,7 +313,7 @@ _BDOS_05:
 	mov al, 'C'
 	int 0x29
 
-	jmp short _BDOS_00
+	jmp _BDOS_00
 	;xor bx,bx
 	;jmp short .end
 	
@@ -316,9 +359,21 @@ _BDOS_05:
 .backspace:
 	or bx, bx
 	jz short .main_loop
-	
+
 	dec bx
+	mov al, [si+bx]
+	cmp al, 0x20
+	jnc .bs_printchar
 	
+	mov al, 8
+	int 0x29
+	mov al, ' '
+	int 0x29
+	mov al, 8
+	int 0x29
+
+.bs_printchar:
+
 	mov al, 8
 	int 0x29
 	mov al, ' '
@@ -335,14 +390,23 @@ _BDOS_05:
 
 	mov [si+bx], al
 	inc bx
+	cmp al, 0x20
+	jc .print_ctrl
 	int 0x29
+	jmp .main_loop
 
-	jmp short .main_loop
-
+.print_ctrl:
+	xchg ax, cx
+	mov al, '^'
+	int 0x29
+	xchg ax, cx
+	add al, 0x40
+	int 0x29
+	jmp .main_loop
 
 .end:
 	cmp bx, di
-	jae .no_last_nul
+	jae short .no_last_nul
 	xor cl, cl
 	mov [si+bx],cl
 .no_last_nul:
@@ -353,6 +417,8 @@ _BDOS_05:
 	pop bx
 	
 	ret
+
+
 
 
 _BDOS_08: ; SYSINFO
@@ -366,6 +432,62 @@ _BDOS_08: ; SYSINFO
 	mov [bp+STK_DX], dx
 	mov ax, INT_DOS_VERSION
 	ret
+
+
+
+
+	; CONST
+int21_0B:
+	call _BDOS_03
+	and al, al
+	jz .no_char
+	mov al, 0xFF
+.no_char:
+	ret
+
+
+	; FLUSH KEYBOARD
+int21_0C:
+	; TODO: NOT SUPPORTED
+	ret
+
+
+	; CONOUT STRING
+_BDOS_04:
+	mov si, dx
+.loop:
+	lodsb
+	or al,al
+	jz short .end
+	int 0x29
+	jmp short .loop
+.end:
+	ret
+
+	; DOS PUTS
+int21_09:
+	mov si, dx
+.loop:
+	lodsb
+	cmp al, '$'
+	jz short .end
+	int 0x29
+	jmp short .loop
+.end:
+	ret
+
+	; DOS GETS
+int21_0A:
+	mov bx, dx
+	mov al, [bx]
+	xor ah, ah
+	inc dx
+	inc dx
+	call _BDOS_05
+	mov [bx+1], al
+	ret
+
+
 
 
 _BDOS_IFS:
@@ -384,6 +506,49 @@ _BDOS_17:
 
 
 
+
+
+%define	SIZE_MAINSTACK	16
+%define	LOCAL_SAVED_HANDLE		-2
+%define	LOCAL_SIZE_CMDLINE		-4
+%define	LOCAL_SIZE_CMD			-6
+%define	LOCAL_SIZE_ARG			-8
+%define	LOCAL_MEMSZ				-10
+
+_int27: ; DOS1+ TERMINATE AND STAY RESIDENT
+	or dx, dx
+	jz short _BDOS_00
+	add dx, byte 0x000F
+	sbb ax, ax
+	mov cl, 4
+	shr dx, cl
+	sub dx, ax
+	les bx, [cs:_osz_systbl]
+	add [es:bx + OSZ_SYSTBL_LASTMEM], dx
+	jmp short _BDOS_00
+
+
+_int00: ; INTEGER DIVIDE BY ZERO
+	push cs
+	pop ds
+	mov dx, int00_msg
+	mov cl, OSZ_DOS_PUTS
+	call _BDOS_entry
+	;jmp _BDOS_00
+
+_BDOS_00: ; EXIT
+	mov cx, cs
+	mov ds, cx
+	mov es, cx
+	cli
+	cld
+	mov ss,[_saved_sssp+2]
+	mov sp,[_saved_sssp]
+	mov bp, sp
+	sub sp, SIZE_MAINSTACK
+	call _crlf
+	jmp short _loop
+
 _crt:
 	mov [_osz_systbl], bx
 	mov [_osz_systbl+2], es
@@ -391,11 +556,42 @@ _crt:
 	mov ax, cs
 	add ax, (_END-_HEAD)/16
 	mov [es:bx+OSZ_SYSTBL_LASTMEM], ax
+
+	xor di, di
+	mov ax, _int00
+	stosw
+	mov ax, cs
+	stosw
+	mov di, 0x20*4
+	mov ax, _BDOS_00
+	stosw
+	mov ax, cs
+	stosw
+	mov ax, _int21
+	stosw
+	mov ax, cs
+	stosw
 	
-	xor bx, bx
-	mov es, bx
-	mov word [es:bx], _int00
-	mov [es:bx+2], cs
+	mov cx, 3 ; 22 23 24
+.loop_int_nop:
+	mov ax, _int_nop
+	stosw
+	mov ax, cs
+	stosw
+	loop .loop_int_nop
+
+	mov ax, _int2526
+	stosw
+	mov ax, cs
+	stosw
+	mov ax, _int2526
+	stosw
+	mov ax, cs
+	stosw
+	mov ax, _int27
+	stosw
+	mov ax, cs
+	stosw
 
 	push cs
 	pop es
@@ -533,7 +729,11 @@ _loop:
 	mov [bp+LOCAL_SAVED_HANDLE], ax
 
 	les bx,[cs:_osz_systbl]
+	mov ax, [es:bx+OSZ_SYSTBL_MEMSZ]
+	mov [bp+LOCAL_MEMSZ], ax
+
 	mov es, [es:bx+OSZ_SYSTBL_LASTMEM]
+%if 0
 	xor di, di
 	mov ax, '_='
 	stosw
@@ -551,22 +751,25 @@ _loop:
 	mov bx, es
 	add di, bx
 	mov es, di
+%endif
 	
+	; create psp
 	xor di, di
 	xor ax, ax
 	mov cx, 0x8000
 	rep stosw
 	
-	mov [es:0x2C], bx
+	;mov [es:0x2C], bx
 
 	;xor di, di
-	mov al, 0xEA
-	stosb
-	mov ax, _BDOS_00
+	mov ax, 0x20CD ; INT 20
 	stosw
-	mov ax, cs
+	mov ax, [bp+LOCAL_MEMSZ]
+	dec ax
 	stosw
 	
+	xor al,al
+	stosb
 	mov ax, 0xFFFF
 	stosb
 	stosw
@@ -899,7 +1102,7 @@ _strlen:
 
 
 app_ext:
-	db ".bin",0
+	db ".com",0
 
 cmd_table:
 	db 2,"cd"

@@ -1,10 +1,10 @@
-; Hello World for OSZ
+; Hello World for OSZ/DOS
 %include "osz.inc"
 [bits 16]
 [org 0x0100]
-	mov cl, OSZ_DOS_PUTS
+	mov ah, 9
 	mov dx, hello_msg
-	call bp
+	int 0x21
 	ret
 
-hello_msg	db "Hello, world!",0
+hello_msg	db "Hello, world!", 13, 10, "$"

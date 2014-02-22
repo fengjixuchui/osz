@@ -171,7 +171,7 @@ _bios_power:
 	
 	; APM shutdown
 	mov ax, 0x5301
-	xor bx, bx
+	;xor bx, bx
 	int 0x15
 	
 	mov ax, 0x530E
@@ -328,7 +328,7 @@ crt:
 .no_lba:
 
 	mov al, 13
-	call _bios_conout
+	int 0x29
 
 	call _bios_init_disk
 	

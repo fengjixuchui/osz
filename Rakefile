@@ -55,7 +55,7 @@ task :default => [PATH_OUTPUT, SUB_TASKS, TARGET].flatten do |t|
   puts "#### BUILD DONE ####"
 end
 
-desc "Run"
+desc "Run with qemu"
 task :run => :default do
   sh "qemu-system-x86_64 -k ja -m 256 -boot a -fda #{ PATH_BOOT_FLP } -localtime -M pc"
 end
@@ -98,8 +98,15 @@ end
 # OSZ
 namespace :osz do
 
+  APP_EXT = ".com"
+
   APPS = [ "hello", "chars", "echo2", "cpuid" ].collect do |t|
-	"#{PATH_OUTPUT}#{t}.bin"
+	bin = "#{PATH_OUTPUT}#{t}#{ APP_EXT }"
+    src = PATH_SRC + File.basename(bin, APP_EXT) + ".asm"
+    file bin => src do |t|
+      sh "#{ AS } -f bin -o #{t.name} #{t.prerequisites.join(' ')}"
+    end
+    bin
   end
   
   EXTRAS = [
@@ -107,7 +114,7 @@ namespace :osz do
 	FileList["extras/*"]
   ].flatten
 
-  [PATH_FDBOOT_IPL, PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_OSBIO2_BIN, PATH_OSSHELL_BIN, PATH_FAT12_BIN, APPS].flatten.each do |bin|
+  [PATH_FDBOOT_IPL, PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_OSBIO2_BIN, PATH_OSSHELL_BIN, PATH_FAT12_BIN].each do |bin|
     src = PATH_SRC + File.basename(bin, ".bin") + ".asm"
     file bin => src do |t|
       sh "#{ AS } -f bin -o #{t.name} #{t.prerequisites.join(' ')}"
