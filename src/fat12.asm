@@ -50,6 +50,14 @@ _crt:
 	mov [_osz_systbl], bx
 	mov [_osz_systbl+2], es
 
+	mov ah, BIOS_INIT_DISK
+	call _call_bios
+	or al, al
+	jnz .install_ok
+	xor ax, ax
+	retf
+.install_ok:
+
 	mov [es:bx+OSZ_SYSTBL_IFS], word _fat12_ifs
 	mov [es:bx+OSZ_SYSTBL_IFS+2], cs
 

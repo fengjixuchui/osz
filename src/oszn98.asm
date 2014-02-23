@@ -273,6 +273,7 @@ _bios_init_disk:
 	int 0x1B
 	mov ax, 0x0730
 	int 0x1B
+	mov ax, 0x0001
 	ret
 
 
@@ -329,6 +330,7 @@ _END_RESIDENT:
 
 
 crt:
+	; installation check
 	mov al, [es:bx + OSZ_SYSTBL_ARCH]
 	or al, al
 	jnz .dont_install
@@ -344,11 +346,13 @@ crt:
 	mov [es:bx + OSZ_SYSTBL_BIOS], word _bios_entry
 	mov [es:bx + OSZ_SYSTBL_BIOS+2], cs
 
+	; save imr
 	in al, 0x02
 	mov [saved_imr], al
 	in al, 0x0A
 	mov [saved_imr+1], al
 
+	; install int
 	mov di, 0x28*4
 	mov ax, __int28
 	stosw
@@ -359,13 +363,15 @@ crt:
 	mov ax, cs
 	stosw
 
+	; mem lower
 	mov al, [es:0x0501]
 	and ax, byte 0x07
 	inc ax
 	mov cl, 13
 	shl ax, cl
 	mov [es:bx + OSZ_SYSTBL_MEMSZ], ax
-	
+
+	; mem middle
 	cmp [es:bx + OSZ_SYSTBL_CPUID], byte 2
 	jb .no_extmem
 	mov al, [es:0x0401]
@@ -375,7 +381,7 @@ crt:
 	mov [es:bx + OSZ_SYSTBL_MEMPROT], ax
 .no_extmem:
 
-	;;  SETUP 640x480
+	; setup 640x480
 	mov al, [es:0x045C]
 	test al, 0x40
 	jz short .no_pegc
@@ -401,8 +407,8 @@ crt:
 
 .no_pegc:
 
+	; misc
 	call _bios_cls
-
 	call _bios_init_disk
 	
 	mov ax, (_END_RESIDENT-_HEAD)/16

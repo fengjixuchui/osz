@@ -52,6 +52,8 @@
 %define	BIOS_INIT_DISK	6
 %define	BIOS_READ_DISK	7
 %define	BIOS_WRITE_DISK	8
+%define	BIOS_READ_MASS	9
+%define	BIOS_WRITE_MASS	10
 
 
 ;;	BDOS

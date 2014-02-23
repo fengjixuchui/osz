@@ -41,6 +41,7 @@ _HEAD:
 	alignb 2
 saved_imr	dw 0
 
+n_fds		db 0
 lba_enabled	db 0
 
 	alignb 2
@@ -219,6 +220,7 @@ _bios_init_disk:
 	xor ax,ax
 	xor dx,dx
 	int 0x13
+	mov al, [cs:n_fds]
 	ret
 
 
@@ -270,6 +272,7 @@ _END_RESIDENT:
 
 
 crt:
+	; installation check
 	mov al, [es:bx + OSZ_SYSTBL_ARCH]
 	cmp al, 0x01
 	jnz .dont_install
@@ -282,16 +285,16 @@ crt:
 .install_ok:
 
 	; setup
-	;mov [_osz_systbl], bx
-	;mov [_osz_systbl+2], es
 	mov [es:bx + OSZ_SYSTBL_BIOS], word _bios_entry
 	mov [es:bx + OSZ_SYSTBL_BIOS+2], cs
 
+	; save imr
 	in al, 0x21
 	mov [saved_imr], al
 	in al, 0xA1
 	mov [saved_imr+1], al
-	
+
+	; install int
 	mov di, 0x28*4
 	mov ax, __int28
 	stosw
@@ -302,11 +305,13 @@ crt:
 	mov ax, cs
 	stosw
 
+	; mem lower
 	int 0x12
 	mov cl, 6
 	shl ax, cl
 	mov [es:bx + OSZ_SYSTBL_MEMSZ], ax
 
+	; mem middle
 	cmp [es:bx + OSZ_SYSTBL_CPUID], byte 2
 	jb .no_extmem
 	mov ah, 0x88
@@ -315,6 +320,18 @@ crt:
 	mov [es:bx + OSZ_SYSTBL_MEMPROT], ax
 .no_extmem:
 
+	; number of fd drives
+	int 0x11
+	test al, 1
+	jz .no_fds
+	mov cl, 6
+	shr ax, cl
+	and al, 0x03
+	inc ax
+	mov [n_fds], al
+.no_fds:
+
+	; check lba bios
 	mov dl, 0x80
 	mov bx, 0x55AA
 	mov ah, 0x41
@@ -327,9 +344,10 @@ crt:
 	mov [lba_enabled], bl
 .no_lba:
 
+	; misc
 	mov al, 13
 	int 0x29
-
+	
 	call _bios_init_disk
 	
 	mov ax, (_END_RESIDENT-_HEAD)/16

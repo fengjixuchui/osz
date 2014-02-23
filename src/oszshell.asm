@@ -199,9 +199,11 @@ _int_nop:
 	iret
 
 
+	; DUMMY DOS CALLS
 int21_03:
 int21_04:
 int21_05:
+	xor al, al
 	ret
 
 
@@ -279,6 +281,19 @@ int21_06:
 _BDOS_03:
 	mov ah, BIOS_CONST
 	jmp short _call_bios
+
+
+	; CONOUT STRING
+_BDOS_04:
+	mov si, dx
+.loop:
+	lodsb
+	or al,al
+	jz short .end
+	int 0x29
+	jmp short .loop
+.end:
+	ret
 
 
 	; CONIN BUFFERED
@@ -421,7 +436,8 @@ _BDOS_05:
 
 
 
-_BDOS_08: ; SYSINFO
+	; SYSINFO
+_BDOS_08:
 	les bx,[cs:_osz_systbl]
 	mov ax, [es:bx + OSZ_SYSTBL_VERSION]
 	mov [bp+STK_BX], ax
@@ -449,19 +465,6 @@ int21_0B:
 	; FLUSH KEYBOARD
 int21_0C:
 	; TODO: NOT SUPPORTED
-	ret
-
-
-	; CONOUT STRING
-_BDOS_04:
-	mov si, dx
-.loop:
-	lodsb
-	or al,al
-	jz short .end
-	int 0x29
-	jmp short .loop
-.end:
 	ret
 
 	; DOS PUTS
@@ -862,22 +865,19 @@ _cmd_mem:
 	push es
 	les bx, [_osz_systbl]
 
-	mov dx, mem_lower_msg
-	mov cl, OSZ_DOS_PUTS
-	call _BDOS_entry
-	mov dx, [es:bx+OSZ_SYSTBL_MEMSZ]
-	mov cl, 6
-	shr dx, cl
-	call _disp_dec
-	mov dx, mem_kb_msg
-	mov cl, OSZ_DOS_PUTS
-	call _BDOS_entry
-
-	mov dx, mem_free_msg
+	mov dx, mem_1_msg
 	mov cl, OSZ_DOS_PUTS
 	call _BDOS_entry
 	mov dx, [es:bx+OSZ_SYSTBL_MEMSZ]
 	sub dx, [es:bx+OSZ_SYSTBL_LASTMEM]
+	mov cl, 6
+	shr dx, cl
+	call _disp_dec
+
+	mov dx, mem_2_msg
+	mov cl, OSZ_DOS_PUTS
+	call _BDOS_entry
+	mov dx, [es:bx+OSZ_SYSTBL_MEMSZ]
 	mov cl, 6
 	shr dx, cl
 	call _disp_dec
@@ -942,9 +942,9 @@ _disp_dec:
 	ret
 
 
-mem_lower_msg	db "Lower Mem: ", 0
-mem_free_msg	db " Free Mem: ", 0
-mem_prot_msg	db " Extended: ", 0
+mem_1_msg		db "Memory: ", 0
+mem_2_msg		db " KB / ", 0
+mem_prot_msg	db "Extend: ", 0
 mem_kb_msg		db " KB", 10, 0
 
 

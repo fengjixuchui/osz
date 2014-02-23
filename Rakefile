@@ -15,6 +15,8 @@ PATH_MISC       = "misc/"
 PATH_BOOT_FLP	= "#{PATH_OUTPUT}floppy.img"
 PATH_CATARC     = "#{PATH_OUTPUT}catarc"
 
+APP_EXT			= ".com"
+
 PATH_FDBOOT_IPL = "#{PATH_OUTPUT}fdboot.bin"
 PATH_OSZ2BOOT_BIN = "#{PATH_OUTPUT}osz2boot.bin"
 PATH_OSBIOS_BIN = "#{PATH_OUTPUT}oszbio.bin"
@@ -98,8 +100,6 @@ end
 # OSZ
 namespace :osz do
 
-  APP_EXT = ".com"
-
   APPS = [ "hello", "chars", "echo2", "cpuid" ].collect do |t|
 	bin = "#{PATH_OUTPUT}#{t}#{ APP_EXT }"
     src = PATH_SRC + File.basename(bin, APP_EXT) + ".asm"
@@ -120,6 +120,32 @@ namespace :osz do
       sh "#{ AS } -f bin -o #{t.name} #{t.prerequisites.join(' ')}"
     end
   end
+
+  PATH_TFDISK_SRC = "#{ PATH_SRC }tfdisk/tfdisk.asm"
+  PATH_TFDISK_BIN = "#{ PATH_OUTPUT }tfdisk#{ APP_EXT }"
+  APPS << PATH_TFDISK_BIN
+  
+  PATH_TFMBR_BIN = "#{ PATH_OUTPUT }tfmbr.ipl"
+  PATH_EXIPL_BIN = "#{ PATH_OUTPUT }exboot.ipl"
+  PATH_IPL16_BIN = "#{ PATH_OUTPUT }hdbt16.ipl"
+  PATH_IPL32_BIN = "#{ PATH_OUTPUT }hdbt32.ipl"
+
+  [PATH_TFMBR_BIN, PATH_EXIPL_BIN, PATH_IPL16_BIN, PATH_IPL32_BIN].each do | bin|
+    src = PATH_SRC + "tfdisk/" + File.basename(bin, ".ipl") + ".asm"
+    file bin => src do |t|
+      sh "#{ AS } -f bin -o #{t.name} #{t.prerequisites.join(' ')}"
+    end
+  end
+
+  file PATH_TFDISK_BIN => [PATH_TFDISK_SRC, PATH_TFMBR_BIN, PATH_EXIPL_BIN, PATH_IPL16_BIN, PATH_IPL32_BIN] do |t|
+    sh ["#{ AS } -i #{ PATH_SRC} -f bin -o #{t.name}",
+      "-DPATH_MBR=\\\"#{File.expand_path(PATH_TFMBR_BIN)}\\\"",
+      "-DPATH_EXIPL=\\\"#{File.expand_path(PATH_EXIPL_BIN)}\\\"",
+      "-DPATH_IPL16=\\\"#{File.expand_path(PATH_IPL16_BIN)}\\\"",
+      "-DPATH_IPL32=\\\"#{File.expand_path(PATH_IPL32_BIN)}\\\"",
+      PATH_TFDISK_SRC].join(' ')
+  end
+
 
   file PATH_OS_SYS => [PATH_OSZ2BOOT_BIN, PATH_OSBIOS_BIN, PATH_OSBIO2_BIN, PATH_FAT12_BIN, PATH_OSSHELL_BIN] do |t|
     sh "cat #{t.prerequisites.join(' ')} > #{ t.name }"
