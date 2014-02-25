@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Zero - Shell interface
+;;	MEG-OS Z - Shell interface
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
@@ -132,7 +132,7 @@ _BDOS_over:
 	ret
 
 _BDOS_entry:
-	cmp cl, (_END_BDOS_function-_BDOS_function_table)/2
+	cmp ah, (_END_BDOS_function-_BDOS_function_table)/2
 	jae short _BDOS_over
 	push es
 	push ds
@@ -145,7 +145,7 @@ _BDOS_entry:
 	push ax
 	mov bp,sp
 
-	mov bl, cl
+	mov bl, ah
 	xor bh, bh
 	add bx, bx
 	call [cs:_BDOS_function_table + bx]
@@ -297,14 +297,14 @@ _BDOS_04:
 
 
 	; CONIN BUFFERED
-	; IN ax = limit ds:dx = buffer
+	; IN cx = limit ds:dx = buffer
 	; OUT ax = length
 _BDOS_05:
 	push bx
 	push si
 	push di
 
-	mov di, ax
+	mov di, cx
 	mov si, dx
 	xor bx, bx
 
@@ -482,8 +482,8 @@ int21_09:
 	; DOS GETS
 int21_0A:
 	mov bx, dx
-	mov al, [bx]
-	xor ah, ah
+	mov cl, [bx]
+	xor ch, ch
 	inc dx
 	inc dx
 	call _BDOS_05
@@ -502,8 +502,9 @@ _BDOS_14:
 _BDOS_15:
 _BDOS_16:
 _BDOS_17:
-	les bx,[cs:_osz_systbl]
-	call far [es:bx+OSZ_SYSTBL_IFS]
+	les di, [cs:_osz_systbl]
+	mov bx, [bp+STK_BX]
+	call far [es:di+OSZ_SYSTBL_IFS]
 	ret
 
 
@@ -535,7 +536,7 @@ _int00: ; INTEGER DIVIDE BY ZERO
 	push cs
 	pop ds
 	mov dx, int00_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	;jmp _BDOS_00
 
@@ -613,17 +614,17 @@ _crt:
 	call _cmd_mem
 _loop:
 	mov si, str_buff
-	mov cl, OSZ_DOS_GET_CWD
+	mov ah, OSZ_DOS_GET_CWD
 	call _BDOS_entry
 	lea dx, [si+2]
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	mov al, '>'
 	int 0x29
 
-	mov ax, MAX_CMDLINE
-	mov cl, OSZ_DOS_GETS
+	mov cx, MAX_CMDLINE
 	mov dx, cmdline
+	mov ah, OSZ_DOS_GETS
 	call _BDOS_entry
 	or ax, ax
 	jz short _loop
@@ -715,14 +716,14 @@ _loop:
 	rep movsb
 
 	mov dx, cmd_buffer
-	mov cl, OSZ_DOS_OPEN
+	mov ah, OSZ_DOS_OPEN
 	call _BDOS_entry
 	test ax, ax
 	jns .load_exec
 
 .bad_cmd:
 	mov dx, bad_cmd_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 
 	jmp _loop
@@ -802,10 +803,10 @@ _loop:
 	pop ds
 
 	mov dx, 0x0100
-	mov cl, OSZ_DOS_READ
+	mov ah, OSZ_DOS_READ
 	call _BDOS_entry
 
-	mov cl, OSZ_DOS_CLOSE
+	mov ah, OSZ_DOS_CLOSE
 	call _BDOS_entry
 
 	mov dx, ds
@@ -835,14 +836,14 @@ _cmd_exit:
 
 _cmd_ver:
 	mov dx, ver_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	ret
 
 
 _cmd_echo:
 	mov dx,arg_buffer
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	call _crlf
 	ret
@@ -850,7 +851,7 @@ _cmd_echo:
 
 _cmd_cd:
 	mov dx,arg_buffer
-	mov cl, OSZ_DOS_SET_CWD
+	mov ah, OSZ_DOS_SET_CWD
 	call _BDOS_entry
 	ret
 
@@ -866,7 +867,7 @@ _cmd_mem:
 	les bx, [_osz_systbl]
 
 	mov dx, mem_1_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	mov dx, [es:bx+OSZ_SYSTBL_MEMSZ]
 	sub dx, [es:bx+OSZ_SYSTBL_LASTMEM]
@@ -875,26 +876,26 @@ _cmd_mem:
 	call _disp_dec
 
 	mov dx, mem_2_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	mov dx, [es:bx+OSZ_SYSTBL_MEMSZ]
 	mov cl, 6
 	shr dx, cl
 	call _disp_dec
 	mov dx, mem_kb_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 
 	mov ax, [es:bx+OSZ_SYSTBL_MEMPROT]
 	or ax, ax
 	jz .no_protmem
 	mov dx, mem_prot_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	mov dx, [es:bx+OSZ_SYSTBL_MEMPROT]
 	call _disp_dec
 	mov dx, mem_kb_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 .no_protmem:
 
@@ -931,8 +932,8 @@ _disp_dec:
 	xor dx, dx
 	jmp short .loop_sz
 .end_sz:
-	mov cl, OSZ_DOS_PUTS
 	mov dx, numbuff
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	
 	pop di
@@ -943,7 +944,7 @@ _disp_dec:
 
 
 mem_1_msg		db "Memory: ", 0
-mem_2_msg		db " KB / ", 0
+mem_2_msg		db "/", 0
 mem_prot_msg	db "Extend: ", 0
 mem_kb_msg		db " KB", 10, 0
 
@@ -951,10 +952,10 @@ mem_kb_msg		db " KB", 10, 0
 
 
 _cmd_dir:
-	xor ax, ax
+	xor bx, bx
 .loop:
 	mov dx, dir_buff
-	mov cl, OSZ_DOS_ENUM_FILE
+	mov ah, OSZ_DOS_ENUM_FILE
 	call _BDOS_entry
 	or ax, ax
 	jz short .end
@@ -985,20 +986,20 @@ _cmd_dir:
 	xor dx, dx
 	jmp short .loop_sz
 .end_sz:
-	mov cl, OSZ_DOS_PUTS
 	mov dx, numbuff
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 
 	mov al, ' '
 	int 0x29
 
-	mov cl, OSZ_DOS_PUTS	
 	mov dx, dir_buff + 64
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	
 	call _crlf
 	
-	pop ax
+	pop bx
 	jmp short .loop
 .end:
 	ret
@@ -1009,13 +1010,13 @@ _cmd_type:
 	push es
 
 	mov dx, arg_buffer
-	mov cl, OSZ_DOS_OPEN
+	mov ah, OSZ_DOS_OPEN
 	call _BDOS_entry
 	test ax, ax
 	jns .file_ok
 
 	mov dx, nofile_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 
 	jmp .end
@@ -1035,14 +1036,14 @@ _cmd_type:
 	rep stosw
 	
 	xor dx, dx
-	mov cl, OSZ_DOS_READ
+	mov ah, OSZ_DOS_READ
 	call _BDOS_entry
 
-	mov cl, OSZ_DOS_CLOSE
+	mov ah, OSZ_DOS_CLOSE
 	call _BDOS_entry
 
 	xor dx, dx
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 
 	call _crlf

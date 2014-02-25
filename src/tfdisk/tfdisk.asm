@@ -54,7 +54,7 @@
 [org 0x0100]
 
 start:
-	mov cl, OSZ_DOS_SYSINFO
+	mov ah, OSZ_DOS_SYSINFO
 	call bp
 	cmp ch, 0x01
 	jnz .boot_ng

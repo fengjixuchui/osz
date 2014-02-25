@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Zero - System common definitions
+;;	MEG-OS Z - System common definitions
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.

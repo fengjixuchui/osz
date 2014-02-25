@@ -32,12 +32,12 @@
 [org 0x0100]
 
 _main:
-	mov cl, OSZ_DOS_SYSINFO
+	mov ah, OSZ_DOS_SYSINFO
 	call bp
 	mov [_cpuid_family_id], cl
 
 	mov dx, _prefix_msg	
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call bp
 
 	mov al, [_cpuid_family_id]
@@ -70,7 +70,7 @@ _main:
 	call _detect_cpuid_string
 	jmp short .end_cpu
 .end_cpu:
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call bp
 
 	mov al, [_cpuid_family_id]
@@ -80,7 +80,7 @@ _main:
 .has_cpuid_feature:
 
 	mov dx, _cpuid_feat_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call bp
 
 	push ds
@@ -115,7 +115,7 @@ _main:
 	stosb
 	
 	mov dx, _cpuid_string_buffer
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call bp
 
 	mov eax, 0x80000000
@@ -124,7 +124,7 @@ _main:
 	jb short .no_cpuid_feature8
 	
 	mov dx, _cpuid_feat8_msg
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call bp
 
 	mov di, _cpuid_string_buffer
@@ -157,7 +157,7 @@ _main:
 	stosb
 
 	mov dx, _cpuid_string_buffer
-	mov cl, OSZ_DOS_PUTS
+	mov ah, OSZ_DOS_PUTS
 	call bp
 
 .no_cpuid_feature8:
@@ -305,20 +305,10 @@ _disp_hex:
 	mov bx, dx
 	and bx, byte 0x000F
 	mov al, [_hex_tbl+bx]
-	call _conout
+	int 0x29
 	pop cx
 	loop .loop
 	pop bx
-	ret
-
-_conout:
-	push cx
-	push dx
-	mov dl, al
-	mov cl, OSZ_DOS_CONOUT
-	call bp
-	pop dx
-	pop cx
 	ret
 
 

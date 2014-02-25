@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Zero - Minimal FAT12 Driver
+;;	MEG-OS Z - Minimal FAT12 Driver
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
@@ -71,6 +71,17 @@ _call_bios:
 	db 0x9A
 _osz_systbl	dd 0
 	ret
+
+
+_fat12_ifs:
+	xchg ax, bx
+	mov bl, bh
+	xor bh, bh
+	sub bl, OSZ_DOS_IFS
+	add bx, bx
+	call [cs:_IFS_func_tbl + bx]
+	retf
+
 
 _fat12_init:
 	push si
@@ -500,14 +511,6 @@ _to_lower:
 .noa:
 	ret
 
-
-_fat12_ifs:
-	sub cl, OSZ_DOS_IFS
-	mov bl, cl
-	xor bh, bh
-	add bx, bx
-	call [cs:_IFS_func_tbl + bx]
-	retf
 
 
 

@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Zero - Second boot loader
+;;	MEG-OS Z - Second boot loader
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.

@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Zero - BIOS for NEC PC-9800 Series Personal Computer
+;;	MEG-OS Z - BIOS for NEC PC-9800 Series Personal Computer
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.

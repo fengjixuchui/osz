@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Zero - BIOS for IBM PC
+;;	MEG-OS Z - BIOS for IBM PC
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
@@ -167,8 +167,7 @@ _bios_power:
 	xor bx, bx
 	mov ds, bx
 	mov [bx], byte 0xCB
-	push cs
-	call _exit_cable3
+	call 0:0
 	
 	; APM shutdown
 	mov ax, 0x5301
@@ -199,11 +198,6 @@ _bios_power:
 _forever:
 	hlt
 	jmp _forever
-
-_exit_cable3:
-	push bx
-	push bx
-	retf
 
 
 _bios_dispose:
