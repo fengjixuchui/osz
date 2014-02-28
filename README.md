@@ -6,6 +6,11 @@ MEG-OS Z
 * 現在のバージョンでおそらく必要な最小メモリは 128KB で、推奨する容量はもっと多くなります。
 
 
+# THIS VERSION
+
+alpha 版です。どうにか起動するようになっただけで使い道はありません。
+
+
 # APPS
 
 ## hello
@@ -31,3 +36,11 @@ MEG-OS Z
 * 386 以上の CPU と LBA に対応した BIOS が必要です。
 * fdisk という名前ですがパーティションの作成・削除をする機能はありません。付ける予定もありません。
 * アルファ版で HDD にアクセスする危険なコマンドなので自己責任でお願いします。
+
+
+# SPECIAL THANKS TO
+
+これらのエミュレータがなければ OSZ は存在しませんでした.
+
+* 8086tiny http://www.megalith.co.uk/8086tiny/
+* 8086run https://bitbucket.org/7shi/8086run/
