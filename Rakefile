@@ -1,7 +1,7 @@
 #! /usr/bin/rake
 # -*- coding: utf-8 -*-
 #
-# Rakefile for MEG-OS Zero
+# Rakefile for MEG-OS Z
 # Copyright(C)2014 MEG-OS project, ALL RIGHTS RESERVED.
 #
 require 'rake/clean'
@@ -151,7 +151,7 @@ namespace :osz do
     sh "cat #{t.prerequisites.join(' ')} > #{ t.name }"
   end
 
-  ROOT_FILES = [PATH_OS_SYS, APPS, EXTRAS].flatten
+  ROOT_FILES = [PATH_OS_SYS, APPS, EXTRAS].flatten.sort {|a, b| File.basename(a).upcase <=> File.basename(b).upcase }
   file PATH_BOOT_FLP => [ PATH_FDBOOT_IPL, ROOT_FILES].flatten do |t|
     sh "#{ CATARC } --bs #{PATH_FDBOOT_IPL} #{ t.name } '#{ ROOT_FILES.join("' '") }'"
   end

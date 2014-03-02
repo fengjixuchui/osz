@@ -375,7 +375,11 @@ _fat12_open:
 	xor bx, bx
 .loop_cmp:
 	mov al, [si+bx]
-	cmp al, [es:di+bx]
+	call _to_lower
+	mov dl, al
+	mov al, [es:di+bx]
+	call _to_lower
+	cmp al, dl
 	jnz .not_equal
 	or al,al
 	jz .found

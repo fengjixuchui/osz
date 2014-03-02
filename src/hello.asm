@@ -1,5 +1,5 @@
 ; Hello World for OSZ/DOS
-%include "osz.inc"
+; PUBLIC DOMAIN
 [bits 16]
 [org 0x0100]
 	mov ah, 9

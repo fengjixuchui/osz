@@ -1,4 +1,5 @@
 ; ECHO for OSZ
+; PUBLIC DOMAIN
 %include "osz.inc"
 [bits 16]
 [org 0x0100]

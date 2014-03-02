@@ -964,6 +964,22 @@ _cmd_dir:
 
 	mov al, ' '
 	int 0x29
+	
+	mov si, dir_buff
+	mov cx, 8
+.loop_fn8:
+	lodsb
+	int 0x29
+	loop .loop_fn8
+	mov al, '.'
+	int 0x29
+	mov cx, 3
+.loop_fn3:
+	lodsb
+	int 0x29
+	loop .loop_fn3
+	mov al, ' '
+	int 0x29
 
 	mov cx, 4
 	mov di,numbuff
@@ -1126,7 +1142,7 @@ cmd_table:
 
 
 ver_msg:
-	db "MEG-OS Z ver 0.0.2", 10, 0
+	db "MEG-OS Z ver 0.0.3", 10, 0
 
 bad_cmd_msg:
 	db "Bad command or file name", 10, 0

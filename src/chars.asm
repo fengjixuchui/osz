@@ -1,4 +1,5 @@
 ; Chars for OSZ/DOS
+; PUBLIC DOMAIN
 [bits 16]
 [org 0x0100]
 	mov al, ' '
