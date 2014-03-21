@@ -217,8 +217,6 @@ _int2526: ; DOS1+ ABSOLUTE DISK I/O (DUMMY)
 _BDOS_unknown:
 _BDOS_06:
 _BDOS_07:
-_BDOS_09:
-_BDOS_0A:
 _BDOS_0B:
 _BDOS_0C:
 _BDOS_0D:
@@ -283,17 +281,12 @@ _BDOS_03:
 	jmp short _call_bios
 
 
-	; CONOUT STRING
-_BDOS_04:
-	mov si, dx
-.loop:
-	lodsb
-	or al,al
-	jz short .end
-	int 0x29
-	jmp short .loop
-.end:
-	ret
+	; BEEP
+_BDOS_09:
+	mov ah, BIOS_BEEP
+	jmp short _call_bios
+
+
 
 
 	; CONIN BUFFERED
@@ -434,6 +427,19 @@ _BDOS_05:
 	ret
 
 
+	; CONOUT STRING
+_BDOS_04:
+	mov si, dx
+.loop:
+	lodsb
+	or al,al
+	jz short .end
+	int 0x29
+	jmp short .loop
+.end:
+	ret
+
+
 
 
 	; SYSINFO
@@ -447,6 +453,15 @@ _BDOS_08:
 	xor dx, dx
 	mov [bp+STK_DX], dx
 	mov ax, INT_DOS_VERSION
+	ret
+
+
+	; GET TICK
+_BDOS_0A:
+	mov ah, BIOS_GET_TICK
+	call _call_bios
+	mov [bp+STK_CX], cx
+	mov [bp+STK_DX], dx
 	ret
 
 

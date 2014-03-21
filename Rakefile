@@ -100,7 +100,7 @@ end
 # OSZ
 namespace :osz do
 
-  APPS = [ "hello", "chars", "echo2", "cpuid" ].collect do |t|
+  APPS = [ "hello", "chars", "echo2", "cpuid", "pipo" ].collect do |t|
 	bin = "#{PATH_OUTPUT}#{t}#{ APP_EXT }"
     src = PATH_SRC + File.basename(bin, APP_EXT) + ".asm"
     file bin => src do |t|

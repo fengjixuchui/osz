@@ -30,6 +30,18 @@
 %include "osz.inc"
 
 
+%define	PORT_TIMER_CNT0	0x0040
+%define	PORT_BEEP_CNT	0x0042
+%define	PORT_TIMER_CTL	0x0043
+%define	PORT_BEEP_FIRE	0x0061
+
+%define	_TIMER_RES		55
+
+%define	TIMER_INIT_BEEP	10110110b
+%define	_BEEP_TICK_L		0x3428
+%define	_BEEP_TICK_H		0x0012
+
+
 [bits 16]
 
 _HEAD:
@@ -41,8 +53,12 @@ _HEAD:
 	alignb 2
 saved_imr	dw 0
 
+tick_count	dd 0
+saved_int1C	dd 0
+
 n_fds		db 0
 lba_enabled	db 0
+
 
 	alignb 2
 _bios_table:
@@ -55,6 +71,16 @@ _bios_table:
 	dw _bios_init_disk
 	dw _bios_fd_read
 	dw _bios_fd_write
+	dw _bios_beep
+	dw _bios_tick
+
+
+__int1C:
+	inc word [cs:tick_count]
+	jnz .no_overflow
+	inc word [cs:tick_count+2]
+.no_overflow:
+	iret
 
 
 __int28:
@@ -81,15 +107,15 @@ _bios_entry:
 	push bx
 	push dx
 	push cx
-	;push ax
-	;mov bp,sp
+	push ax
+	mov bp, sp
 
 	mov bl, ah
 	mov bh, 0x00
 	add bx, bx
 	call [cs:_bios_table + bx]
 
-	;lea sp,[bp+2]
+	lea sp, [bp+2]
 	pop cx
 	pop dx
 	pop bx
@@ -261,6 +287,45 @@ _bios_fd_write:
 	ret
 
 
+_bios_beep:
+	pushf
+	cli
+	or cx, cx
+	jz short .stop
+	cmp cx, 0x0001
+	jz short .fire
+	mov al, TIMER_INIT_BEEP
+	out PORT_TIMER_CTL, al
+	mov ax, _BEEP_TICK_L
+	mov dx, _BEEP_TICK_H
+	div cx
+	out PORT_BEEP_CNT,al
+	mov al, ah
+	out PORT_BEEP_CNT,al
+.fire:
+	in al,PORT_BEEP_FIRE
+	or al, 0x03
+	and al, 0x0F
+	out PORT_BEEP_FIRE,al
+	jmp short .end
+.stop:
+	in al,PORT_BEEP_FIRE
+	and al, 0x0D
+	out PORT_BEEP_FIRE,al
+.end:
+	popf
+	ret
+
+
+_bios_tick:
+	mov ax, [cs:tick_count]
+	mov dx, [cs:tick_count+2]
+	mov cx, _TIMER_RES
+	mov [bp+2], cx
+	mov [bp+4], dx
+	ret
+
+
 	alignb 16
 _END_RESIDENT:
 
@@ -289,6 +354,15 @@ crt:
 	mov [saved_imr+1], al
 
 	; install int
+	mov di, 0x1C*4
+	mov ax, [es:di]
+	mov cx, [es:di+2]
+	mov [cs:saved_int1C], ax
+	mov [cs:saved_int1C+2], cx
+	mov ax, __int1C
+	stosw
+	mov ax, cs
+	stosw
 	mov di, 0x28*4
 	mov ax, __int28
 	stosw

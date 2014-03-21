@@ -30,6 +30,29 @@
 %include "osz.inc"
 
 
+%define	PORT_PIC0_OCW	0x0000
+%define	PORT_PIC0_IMR	0x0002
+%define	PORT_PIC0_ISR	PORT_PIC0_OCW
+%define	PORT_PIC0_ICW1	PORT_PIC0_OCW
+%define	PORT_PIC0_ICW2	PORT_PIC0_IMR
+%define	PORT_PIC1_OCW	0x0008
+%define	PORT_PIC1_IMR	0x000A
+%define	PORT_PIC1_ISR	PORT_PIC1_OCW
+%define	PORT_PIC1_ICW1	PORT_PIC1_OCW
+%define	PORT_PIC1_ICW2	PORT_PIC1_IMR
+%define	PORT_TIMER_CNT0	0x0071
+%define	PORT_BEEP_CNT	0x0073
+%define	PORT_TIMER_CTL	0x0077
+
+%define	_TIMER_INIT_CNT0		00110100b
+%define	_TIMER_TICK		24576
+%define	_TIMER_RES		10
+
+%define	TIMER_INIT_BEEP	10110110b
+%define	_BEEP_TICK_L		0x8000
+%define	_BEEP_TICK_H		0x0025
+
+
 [bits 16]
 
 _HEAD:
@@ -40,6 +63,9 @@ _HEAD:
 
 	alignb 2
 saved_imr	dw 0
+
+tick_count	dd 0
+saved_irq00	dd 0
 
 cons_cursor	dw 0, 0xA000
 cons_scroll	dw 160*24
@@ -54,6 +80,22 @@ _bios_table:
 	dw _bios_init_disk
 	dw _bios_fd_read
 	dw _bios_fd_write
+	dw _bios_beep
+	dw _bios_tick
+
+
+__irq00:
+	push ax
+	mov al, 0x60
+	out PORT_PIC0_OCW, al
+
+	inc word [cs:tick_count]
+	jnz .no_overflow
+	inc word [cs:tick_count+2]
+.no_overflow:
+
+	pop ax
+	iret
 
 
 __int28:
@@ -80,15 +122,15 @@ _bios_entry:
 	push bx
 	push dx
 	push cx
-	;push ax
-	;mov bp,sp
+	push ax
+	mov bp, sp
 
 	mov bl, ah
 	mov bh, 0x00
 	add bx, bx
 	call [cs:_bios_table + bx]
 
-	;lea sp,[bp+2]
+	lea sp, [bp+2]
 	pop cx
 	pop dx
 	pop bx
@@ -115,7 +157,7 @@ _bios_const:
 
 _bios_conin:
 .loop:
-	mov ah,0x01
+	mov ah, 0x01
 	int 0x18
 	or bh, bh
 	jz short .wait
@@ -278,6 +320,7 @@ _bios_init_disk:
 
 
 _bios_fd_read:
+	push bp
 	xor di,di
 	
 	mov ax,[si+0x08]
@@ -315,11 +358,48 @@ _bios_fd_read:
 
 .end:
 	mov ax, di
+	pop bp
 	ret
 
 
 _bios_fd_write:
 	xor ax, ax
+	ret
+
+
+_bios_beep:
+	pushf
+	cli
+	or cx, cx
+	jz short .stop
+	cmp cx, 0x0001
+	jz short .fire
+	mov al, TIMER_INIT_BEEP
+	out PORT_TIMER_CTL, al
+	mov ax, _BEEP_TICK_L
+	mov dx, _BEEP_TICK_H
+	div cx
+	out PORT_BEEP_CNT,al
+	mov al, ah
+	out PORT_BEEP_CNT,al
+.fire:
+	mov al, 0x06
+	out 0x37, al
+	jmp short .end
+.stop:
+	mov al, 0x07
+	out 0x37, al
+.end:
+	popf
+	ret
+
+
+_bios_tick:
+	mov ax, [cs:tick_count]
+	mov dx, [cs:tick_count+2]
+	mov cx, _TIMER_RES
+	mov [bp+2], cx
+	mov [bp+4], dx
 	ret
 
 
@@ -347,12 +427,32 @@ crt:
 	mov [es:bx + OSZ_SYSTBL_BIOS+2], cs
 
 	; save imr
-	in al, 0x02
+	in al, PORT_PIC0_IMR
 	mov [saved_imr], al
-	in al, 0x0A
+	in al, PORT_PIC1_IMR
 	mov [saved_imr+1], al
 
+	; init PIT
+	mov al,_TIMER_INIT_CNT0
+	out PORT_TIMER_CTL,al
+	mov ax,_TIMER_TICK
+	out PORT_TIMER_CNT0,al
+	mov al, ah
+	out PORT_TIMER_CNT0,al
+	in al, PORT_PIC0_IMR
+	and al, 0xFE
+	out PORT_PIC0_IMR, al
+
 	; install int
+	mov di, 0x08*4
+	mov ax, [es:di]
+	mov cx, [es:di+2]
+	mov [cs:saved_irq00], ax
+	mov [cs:saved_irq00+2], cx
+	mov ax, __irq00
+	stosw
+	mov ax, cs
+	stosw
 	mov di, 0x28*4
 	mov ax, __int28
 	stosw

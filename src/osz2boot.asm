@@ -30,6 +30,7 @@
 %include "osz.inc"
 
 %define	VER_INTEGER		0x0003
+%define	IPL_SIGN		0x1eaf
 
 %define	ORG_BASE		0x0800
 %define	_osz_systbl		0x0600
@@ -39,7 +40,7 @@
 [org ORG_BASE]
 
 _HEAD:
-	xor ax,0x1eaf
+	xor ax, IPL_SIGN
 	jz short _crt
 forever:
 	jmp short forever
@@ -118,7 +119,7 @@ _crt:
 	mov di, _osz_systbl
 	mov cx, OSZ_SYSTBL_SIZE/2
 	rep stosw
-		
+
 	pop ax
 	mov [es:_osz_systbl + OSZ_SYSTBL_ARCH], ax
 	mov al, 0xEA
@@ -204,36 +205,6 @@ _DETECT_CPUID:
 .env_no_cpuid:
 
 .end_cpu:
-
-%if 0
-	;;  A20 Check
-_A20chk:
-	cmp byte [es:di], 2
-	jb short .ng
-	xor ax,ax
-	mov ds,ax
-	dec ax
-	mov es,ax
-	xor si,si
-	mov di,16
-	mov cx,512
-	rep cmpsw
-	push cs
-	pop ds
-	jnz short .ok
-.ng:
-	jmp short .last
-.ok:
-	mov dx, _A20_ok_msg
-	push cs
-	pop ds
-	mov cl, OSZ_DOS_PUTS
-	push cs
-	call _BDOS_entry
-.last:
-	push cs
-	pop ds
-%endif
 
 	retf
 
