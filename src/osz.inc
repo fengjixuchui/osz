@@ -53,7 +53,7 @@
 %define	BIOS_READ_DISK	7
 %define	BIOS_WRITE_DISK	8
 %define	BIOS_BEEP		9
-%define	BIOS_GET_TICK	10
+%define	BIOS_GET_TICK	0x0A
 
 %define	BIOS_READ_MASS	99999
 %define	BIOS_WRITE_MASS	99999
@@ -70,6 +70,7 @@
 %define	OSZ_DOS_SYSINFO	0x08
 %define	OSZ_DOS_BEEP		0x09
 %define	OSZ_DOS_GET_TICK		0x0A
+%define	OSZ_DOS_WAIT_TICK		0x0B
 
 %define	OSZ_DOS_IFS		0x10
 %define	OSZ_DOS_GET_CWD	0x10

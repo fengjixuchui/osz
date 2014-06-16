@@ -433,12 +433,17 @@ _fat12_read:
 	ret
 
 .valid_handle:
+	push bp
+	mov bp, sp
+	sub sp, 2
+
 	mov cl, 5
 	shl si, cl
 	add si, _fat12_dir_buffer
 	mov bx, [cs:si + 0x1A]
 	mov ax, [cs:si + 0x1C]
 	mov di, [cs:si + 0x1E]
+	mov [bp-2], ax
 	add ax, 0x01FF
 	adc di, byte 0
 	mov cl, 9
@@ -446,9 +451,9 @@ _fat12_read:
 	mov cl, 7
 	shl di, cl
 	or di, ax
-	jz .end
+	jz short .end_z
 	or bx, bx
-	jz .end
+	jz short .end_z
 
 	mov si, _fat12_packet
 	mov [cs:si+2], word 0x0001
@@ -477,14 +482,21 @@ _fat12_read:
 	mov ax, 0x0020
 	add [si+6], ax
 	dec di
-	je .end
+	je short .end_s
 
 	mov ax, bx
 	call _fat12_next
 	mov bx, ax
-	jmp .loop
-	
+	jmp short .loop
+
+.end_s:
+	mov ax, [bp-2]
+	jmp short .end
+.end_z:
+	xor ax, ax
 .end:
+	mov sp, bp
+	pop bp
 	ret
 
 

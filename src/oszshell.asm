@@ -32,6 +32,7 @@
 
 
 %define	INT_DOS_VERSION		0x3205
+%define	MAGIC_WORD			0xE2C3
 
 %define OSZ_BDOS	0x000A
 
@@ -217,7 +218,6 @@ _int2526: ; DOS1+ ABSOLUTE DISK I/O (DUMMY)
 _BDOS_unknown:
 _BDOS_06:
 _BDOS_07:
-_BDOS_0B:
 _BDOS_0C:
 _BDOS_0D:
 _BDOS_0E:
@@ -467,6 +467,36 @@ _BDOS_0A:
 
 
 
+	; WAIT TICK
+_BDOS_0B:
+	mov bx, cx
+
+	mov ah, BIOS_GET_TICK
+	call _call_bios
+	mov si, ax
+	mov di, dx
+
+.loop:
+	int 0x28
+	mov ah, BIOS_GET_TICK
+	call _call_bios
+
+	sub ax, si
+	sbb dx, di
+	or dx, dx
+	jnz .end
+
+	mul cx
+	or dx, dx
+	jnz .end
+	cmp ax, bx
+	jb .loop
+
+.end:
+	ret
+
+
+
 	; CONST
 int21_0B:
 	call _BDOS_03
@@ -507,7 +537,7 @@ int21_0A:
 
 
 
-
+	; TODO: IFS
 _BDOS_IFS:
 _BDOS_10:
 _BDOS_11:
@@ -548,12 +578,17 @@ _int27: ; DOS1+ TERMINATE AND STAY RESIDENT
 
 
 _int00: ; INTEGER DIVIDE BY ZERO
+	mov dx, int00_msg
+	jmp short _abort_w_msg
+
+_int04: ; INTO DETECTED OVERFLOW
+	mov dx, int04_msg
+_abort_w_msg:
 	push cs
 	pop ds
-	mov dx, int00_msg
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
-	;jmp _BDOS_00
+	;jmp short _BDOS_00
 
 _BDOS_00: ; EXIT
 	mov cx, cs
@@ -578,6 +613,11 @@ _crt:
 
 	xor di, di
 	mov ax, _int00
+	stosw
+	mov ax, cs
+	stosw
+	mov di, 0x04*4
+	mov ax, _int04
 	stosw
 	mov ax, cs
 	stosw
@@ -820,6 +860,7 @@ _loop:
 	mov dx, 0x0100
 	mov ah, OSZ_DOS_READ
 	call _BDOS_entry
+	mov di, ax
 
 	mov ah, OSZ_DOS_CLOSE
 	call _BDOS_entry
@@ -828,11 +869,13 @@ _loop:
 	cli
 	mov ss, dx
 	xor sp, sp
-	mov cx, 0x0100
+	mov bx, 0x0100
 	xor ax, ax
 	push ax
 	push ss
-	push cx
+	push bx
+	cmp word [bx], MAGIC_WORD
+	jz short .magic_found
 	xor cx, cx
 	xor dx, dx
 	xor bx, bx
@@ -841,6 +884,16 @@ _loop:
 	xor di, di
 	sti
 	retf
+
+.magic_found:
+	push cs
+	pop ds
+	mov dx, di
+	call _disp_dec
+	mov dx, bad_magic_found_msg
+	mov ah, OSZ_DOS_PUTS
+	call _BDOS_entry
+	jmp _BDOS_00
 
 
 _cmd_exit:
@@ -1157,15 +1210,20 @@ cmd_table:
 
 
 ver_msg:
-	db "MEG-OS Z ver 0.0.3", 10, 0
+	db "MEG-OS Z ver 0.0.4", 10, 0
 
 bad_cmd_msg:
 	db "Bad command or file name", 10, 0
+
+bad_magic_found_msg:
+	db "Bad MAGIC found", 10, 0
 
 nofile_msg:
 	db "No such file or directory", 10, 0
 
 int00_msg	db 10, "#DIV/0!", 10, 0
+
+int04_msg	db 10, "#OVERFLOW", 10, 0
 
 
 	alignb 16

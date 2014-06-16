@@ -29,7 +29,7 @@
 
 %include "osz.inc"
 
-%define	VER_INTEGER		0x0003
+%define	VER_INTEGER		0x0004
 %define	IPL_SIGN		0x1eaf
 
 %define	ORG_BASE		0x0800
