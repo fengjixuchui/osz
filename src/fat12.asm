@@ -63,7 +63,7 @@ _crt:
 
 	call _fat12_init
 	
-	mov ax,(SIZE_BSS + _END-_HEAD)/16
+	mov ax, (SIZE_BSS + _END-_HEAD)/16
 	retf
 
 
@@ -335,7 +335,7 @@ _lfn_progress:
 	lodsw
 	call _lfn_conv_char
 	xor al, al
-	mov [di], al
+	mov [es:di], al
 
 	pop si
 	pop dx
