@@ -134,7 +134,7 @@ namespace :osz do
   end
 
 	# kernel
-  OSZ_MODS = %w[ osz2boot oszbio oszn98 fat12 oszshell ].collect do |t|
+  OSZ_MODS = %w[ osz2boot oszbio oszn98 fat12 oszre oszshell ].collect do |t|
 	bin = "#{ PATH_OUTPUT }mod_#{ t }.bin"
     src = "#{ PATH_SRC }#{ t }.asm"
     file bin => src do |t|
@@ -158,7 +158,7 @@ namespace :osz do
 	# fd image
   ROOT_FILES = [PATH_OS_SYS, APPS, EXTRAS].flatten.sort {|a, b| File.basename(a).upcase <=> File.basename(b).upcase }
   file PATH_BOOT_FLP => [ PATH_FDBOOT_IPL, ROOT_FILES].flatten do |t|
-    sh "#{ PATH_CATARC } --bs #{ PATH_FDBOOT_IPL } #{ t.name } '#{ ROOT_FILES.join("' '") }'"
+	sh "#{ PATH_CATARC } --bs #{ PATH_FDBOOT_IPL } #{ t.name } '#{ ROOT_FILES.join("' '") }'"
   end
 
 end

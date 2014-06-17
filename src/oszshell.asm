@@ -39,6 +39,8 @@
 %define	MAX_CMDLINE	127
 %define	MAX_CMD		127
 
+%define	MAX_COM_FILE	0xFF00
+
 ;;	256
 %define	str_buff	_BSS
 ;;	256
@@ -562,7 +564,8 @@ _BDOS_17:
 %define	LOCAL_SIZE_CMDLINE		-4
 %define	LOCAL_SIZE_CMD			-6
 %define	LOCAL_SIZE_ARG			-8
-%define	LOCAL_MEMSZ				-10
+%define	LOCAL_SIZE_APP_BIN		-10
+%define	LOCAL_MEMSZ				-12
 
 _int27: ; DOS1+ TERMINATE AND STAY RESIDENT
 	or dx, dx
@@ -858,8 +861,10 @@ _loop:
 	pop ds
 
 	mov dx, 0x0100
+	mov cx, MAX_COM_FILE
 	mov ah, OSZ_DOS_READ
 	call _BDOS_entry
+	;mov [bp+LOCAL_SIZE_APP_BIN], ax
 	mov di, ax
 
 	mov ah, OSZ_DOS_CLOSE
@@ -874,8 +879,11 @@ _loop:
 	push ax
 	push ss
 	push bx
-	cmp word [bx], MAGIC_WORD
+	mov ax, [bx]
+	cmp ax, MAGIC_WORD
 	jz short .magic_found
+	cmp al, 0xC9
+	jz short .bad_magic
 	xor cx, cx
 	xor dx, dx
 	xor bx, bx
@@ -887,9 +895,14 @@ _loop:
 
 .magic_found:
 	push cs
+	pop es
+	mov bx, _psp_bdos
+	mov cx, di
+	mov ah, OSZ_I3F_HANDLE_MAGIC
+	int 0x3F
+.bad_magic:
+	push cs
 	pop ds
-	mov dx, di
-	call _disp_dec
 	mov dx, bad_magic_found_msg
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
@@ -1210,7 +1223,7 @@ cmd_table:
 
 
 ver_msg:
-	db "MEG-OS Z ver 0.0.4", 10, 0
+	db "OSZ ver 0.0.4", 10, 0
 
 bad_cmd_msg:
 	db "Bad command or file name", 10, 0
