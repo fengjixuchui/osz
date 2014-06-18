@@ -92,7 +92,7 @@ end
 namespace :osz do
 
 	# normal apps
-  APPS = %w[ hello chars echo2 cpuid pipo test ].collect do |t|
+  APPS = %w[ hello chars chars2 echo2 cpuid pipo test ].collect do |t|
 	bin = "#{ PATH_OUTPUT }#{ t }#{ APP_EXT }"
     src = "#{ PATH_SRC }#{ t }.asm"
     file bin => src do |t|

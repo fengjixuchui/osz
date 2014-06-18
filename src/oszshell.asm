@@ -32,13 +32,13 @@
 
 
 %define	INT_DOS_VERSION		0x3205
-%define	MAGIC_WORD			0xE2C3
 
 %define OSZ_BDOS	0x000A
 
 %define	MAX_CMDLINE	127
 %define	MAX_CMD		127
 
+%define	COM_ORG_100		0x0100
 %define	MAX_COM_FILE	0xFF00
 
 ;;	256
@@ -557,8 +557,6 @@ _BDOS_17:
 
 
 
-
-
 %define	SIZE_MAINSTACK	16
 %define	LOCAL_SAVED_HANDLE		-2
 %define	LOCAL_SIZE_CMDLINE		-4
@@ -566,45 +564,6 @@ _BDOS_17:
 %define	LOCAL_SIZE_ARG			-8
 %define	LOCAL_SIZE_APP_BIN		-10
 %define	LOCAL_MEMSZ				-12
-
-_int27: ; DOS1+ TERMINATE AND STAY RESIDENT
-	or dx, dx
-	jz short _BDOS_00
-	add dx, byte 0x000F
-	sbb ax, ax
-	mov cl, 4
-	shr dx, cl
-	sub dx, ax
-	les bx, [cs:_osz_systbl]
-	add [es:bx + OSZ_SYSTBL_LASTMEM], dx
-	jmp short _BDOS_00
-
-
-_int00: ; INTEGER DIVIDE BY ZERO
-	mov dx, int00_msg
-	jmp short _abort_w_msg
-
-_int04: ; INTO DETECTED OVERFLOW
-	mov dx, int04_msg
-_abort_w_msg:
-	push cs
-	pop ds
-	mov ah, OSZ_DOS_PUTS
-	call _BDOS_entry
-	;jmp short _BDOS_00
-
-_BDOS_00: ; EXIT
-	mov cx, cs
-	mov ds, cx
-	mov es, cx
-	cli
-	cld
-	mov ss,[_saved_sssp+2]
-	mov sp,[_saved_sssp]
-	mov bp, sp
-	sub sp, SIZE_MAINSTACK
-	call _crlf
-	jmp short _loop
 
 _crt:
 	mov [_osz_systbl], bx
@@ -670,6 +629,47 @@ _crt:
 
 	call _cmd_ver
 	call _cmd_mem
+	jmp short _loop
+
+_int27: ; DOS1+ TERMINATE AND STAY RESIDENT
+	or dx, dx
+	jz short _BDOS_00
+	add dx, byte 0x000F
+	sbb ax, ax
+	mov cl, 4
+	shr dx, cl
+	sub dx, ax
+	les bx, [cs:_osz_systbl]
+	add [es:bx + OSZ_SYSTBL_LASTMEM], dx
+	jmp short _BDOS_00
+
+
+_int00: ; INTEGER DIVIDE BY ZERO
+	mov dx, int00_msg
+	jmp short _abort_w_msg
+
+_int04: ; INTO DETECTED OVERFLOW
+	mov dx, int04_msg
+_abort_w_msg:
+	push cs
+	pop ds
+	mov ah, OSZ_DOS_PUTS
+	call _BDOS_entry
+	;jmp short _BDOS_00
+
+_BDOS_00: ; EXIT
+	mov cx, cs
+	mov ds, cx
+	mov es, cx
+	cli
+	cld
+	mov ss,[_saved_sssp+2]
+	mov sp,[_saved_sssp]
+	mov bp, sp
+	sub sp, SIZE_MAINSTACK
+	call _crlf
+	;jmp short _loop
+
 _loop:
 	mov si, str_buff
 	mov ah, OSZ_DOS_GET_CWD
@@ -860,7 +860,7 @@ _loop:
 	push es
 	pop ds
 
-	mov dx, 0x0100
+	mov dx, COM_ORG_100
 	mov cx, MAX_COM_FILE
 	mov ah, OSZ_DOS_READ
 	call _BDOS_entry
@@ -870,36 +870,46 @@ _loop:
 	mov ah, OSZ_DOS_CLOSE
 	call _BDOS_entry
 
+	push cs
+	pop es
+	mov cx, di
+	mov si, COM_ORG_100
+	mov bx, _psp_bdos
+	mov dx, [si]
+	mov ax, OSZ_I3F_HANDLE_MAGIC
+	int 0x3F
+
+	mov ax, dx
+	cmp ax, 'ZM' ; DOS EXEC
+	jz short .bad_magic
+	cmp ax, 'MZ' ; DOS EXEC
+	jz short .bad_magic
+	cmp al, 0xC9 ; INVALID
+	jz short .bad_magic
+	cmp al, 0xC3 ; VALID BAD SILENT
+	jz short .magic_silent
+
 	mov dx, ds
 	cli
 	mov ss, dx
 	xor sp, sp
-	mov bx, 0x0100
+
 	xor ax, ax
-	push ax
-	push ss
-	push bx
-	mov ax, [bx]
-	cmp ax, MAGIC_WORD
-	jz short .magic_found
-	cmp al, 0xC9
-	jz short .bad_magic
-	xor cx, cx
+	;xor cx, cx
 	xor dx, dx
 	xor bx, bx
+	push ax
+	push ds
+	push si
+	push ds
+	pop es
+
 	mov bp, OSZ_BDOS
 	xor si, si
 	xor di, di
 	sti
 	retf
 
-.magic_found:
-	push cs
-	pop es
-	mov bx, _psp_bdos
-	mov cx, di
-	mov ah, OSZ_I3F_HANDLE_MAGIC
-	int 0x3F
 .bad_magic:
 	push cs
 	pop ds
@@ -907,6 +917,11 @@ _loop:
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	jmp _BDOS_00
+
+.magic_silent:
+	jmp _BDOS_00
+
+
 
 
 _cmd_exit:
