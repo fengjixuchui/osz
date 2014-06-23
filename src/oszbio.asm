@@ -249,9 +249,8 @@ _bios_init_disk:
 	int 0x13
 	jc short .fail
 
-	mov [cs:current_fd_c_r], cx
-
-	mov ax, [cs:current_fd_c_r]
+	mov ax, cx
+	mov [cs:current_fd_c_r], ax
 	ret
 
 .fail:
@@ -269,11 +268,7 @@ _bios_fd_read:
 .loop:
 	push ax
 	push cx
-	
-	;mov dl, [cs:current_fd_c_r]
-	mov dx, ax ;[si+0x08]
 	div byte [cs:current_fd_c_r]
-	
 	mov cl, ah
 	mov ch, al
 	xor dh, dh
