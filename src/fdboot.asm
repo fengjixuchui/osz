@@ -33,6 +33,8 @@ _HEAD:
 	jmp short main
 	nop
 	db "IPL4MEG "
+%if 1
+	; 2HD 1440KB
 	dw 0x0200
 	db 1
 	dw 1
@@ -43,6 +45,19 @@ _HEAD:
 	dw 9
 	dw 18
 	dw 2
+%else
+	; 2DD 720KB
+	dw 0x0200
+	db 2
+	dw 1
+	db 2
+	dw 0x0070
+	dw 0x05A0
+	db 0xF9
+	dw 3
+	dw 9
+	dw 2
+%endif
 	times 10 db 0
 	db 0x29
 	dd 0xFFFFFFFF
@@ -119,6 +134,18 @@ _next:
 	mov es, ax
 	push es
 
+	mov al, [0x000D]
+	xor dx, dx
+.loop_clst_sft:
+	shr al, 1
+	jz .end
+	inc dx
+	jmp .loop_clst_sft
+.end:
+	mov [_clust_sft], dl
+
+	;db 0xD6
+
 	;; read Root DIR
 	mov ax, [0x0011]
 	mov cl, 5
@@ -170,9 +197,14 @@ lfl:
 	cmp si, 0x0FF7
 	jae force
 	push si
-	sub si, byte 2
+	mov cl, [_clust_sft]
+	dec si
+	dec si
+	shl si, cl
 	add si, [fat2]
-	mov cx, [0x000B]
+	mov dx, [0x000B]
+	shl dx, cl
+	mov cx, dx
 	call diskread
 noread:
 	pop ax
@@ -271,6 +303,7 @@ fat2    dw 0
 _arch   db 0
 __PDA   db 0
 __N     db 0
+_clust_sft	db 0
 
 	times 0x01FE-($-$$) db 0
 	db 0x55, 0xAA

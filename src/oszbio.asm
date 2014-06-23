@@ -59,6 +59,8 @@ saved_int1C	dd 0
 n_fds		db 0
 lba_enabled	db 0
 
+current_fd_c_r	dw 0
+
 
 	alignb 2
 _bios_table:
@@ -237,10 +239,24 @@ _bios_dispose:
 
 
 _bios_init_disk:
-	xor ax,ax
-	xor dx,dx
+	xor ax, ax
+	xor dl, dl
 	int 0x13
-	mov al, [cs:n_fds]
+	jc short .fail
+
+	mov ah, 0x08
+	xor dl, dl
+	int 0x13
+	jc short .fail
+
+	mov [cs:current_fd_c_r], cx
+
+	mov ax, [cs:current_fd_c_r]
+	ret
+
+.fail:
+	xor ax, ax
+	mov [cs:current_fd_c_r], ax
 	ret
 
 
@@ -250,11 +266,14 @@ _bios_fd_read:
 	mov ax,[si+0x08]
 	les bx,[si+0x04]
 	mov cx,[si+0x02]
-.loop:	
+.loop:
 	push ax
 	push cx
-	mov cl, 18
-	div cl
+	
+	;mov dl, [cs:current_fd_c_r]
+	mov dx, ax ;[si+0x08]
+	div byte [cs:current_fd_c_r]
+	
 	mov cl, ah
 	mov ch, al
 	xor dh, dh
@@ -326,8 +345,12 @@ _bios_tick:
 	ret
 
 
+
+
 	alignb 16
 _END_RESIDENT:
+
+
 
 
 crt:

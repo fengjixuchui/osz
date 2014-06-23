@@ -83,23 +83,69 @@ _fat12_ifs:
 	retf
 
 
+
 _fat12_init:
+	push cs
+	pop ds
+	push cs
+	pop es
+
 	push si
-	
+	push di
+
 	mov ah, BIOS_INIT_DISK
 	call _call_bios
+	mov dx, ax
+
+	mov si, _bpb_table
+	mov di, _current_disk_id
+.find_bpb:
+	lodsw
+	or ax, ax
+	jz .invalid_bpb
+	cmp ax, dx
+	jz short .found_bpb
+	add si, byte 3
+	jmp short .find_bpb
+.invalid_bpb:
+	stosw
+	stosw
+	stosw
+	stosw
+	stosb
+	mov [_n_root_entries], ax
+	jmp _end_init
+
+.found_bpb:
+	stosw
+	lodsw
+	stosw
+	mov cl, ah
+	xor ah, ah
+	xor ch, ch
+	add al, al
+	inc al
+	stosw
+	add ax, cx
+	stosw
+	movsb
+
+.end_bpb:
 
 	mov si, _fat12_packet
 	mov [si+8], word 1
 	mov [si+6], cs
 	mov [si+4], word _fat12_fat_buffer
-	mov [si+2], byte 9 ; number of sectors of fat
+	mov al, [_n_sectors_fat]
+	mov [si+2], al
 	mov ah, BIOS_READ_DISK
 	call _call_bios
 
-	mov [si+8], word 19 ; begin root dir sector
+	mov ax, [_begin_root_dir]
+	mov [si+8], ax
 	mov [si+4], word _fat12_dir_buffer
-	mov [si+2], byte 14 ; number of sectors of root dir
+	mov al, [_n_sectors_root_dir]
+	mov [si+2], al
 	mov ah, BIOS_READ_DISK
 	call _call_bios
 
@@ -118,6 +164,8 @@ _scan_root:
 .end:
 	mov [_n_root_entries], dx
 
+_end_init:
+	pop di
 	pop si
 	ret
 
@@ -456,7 +504,6 @@ _fat12_read:
 	jz short .end_z
 
 	mov si, _fat12_packet
-	mov [cs:si+2], word 0x0001
 	
 	mov ax, dx
 	and ax, 0x000F
@@ -470,17 +517,28 @@ _fat12_read:
 	push cs
 	pop ds
 
+	mov cl, [cs:_cluster_shift]
 	mov ax, bx
-	
+	shr di, cl
+	adc di, 0
 .loop:
-	add ax, 14 + 19 - 2 ; culster to sector
-	
+
+	sub ax, byte 2
+	shl ax, cl
+	add ax, [cs:_begin_clust_2]
 	mov [si+8],ax
+
+	mov ax, 1
+	shl ax, cl
+	mov [si+2], ax
+
 	mov ah, BIOS_READ_DISK
 	call _call_bios
-	
+
 	mov ax, 0x0020
+	shl ax, cl
 	add [si+6], ax
+
 	dec di
 	je short .end_s
 
@@ -539,9 +597,14 @@ _fat12_packet:
 	dd 0, 0
 
 
-_dummy_path	db 3, "//A"
-
-_n_root_entries	dw 0
+_current_disk_id	dw 0
+_n_sectors_fat		db 0
+_n_sectors_root_dir	db 0
+_begin_root_dir		dw 0
+_begin_clust_2		dw 0
+_cluster_shift		db 0
+					db 0 ; PADDING
+_n_root_entries		dw 0
 
 _IFS_func_tbl:
 	dw _fat12_get_cwd
@@ -552,6 +615,20 @@ _IFS_func_tbl:
 	dw _fat12_nop; write
 	dw _fat12_nop; seek
 	dw _fat12_enum_file
+
+
+_bpb_table:
+	dw 0x2708 ; 2D CHRN(40,2,9,2)
+	db 2, 7, 1
+	dw 0x4F09 ; 2DD CHRN(80,2,9,2)
+	db 3, 7, 1
+	dw 0x4F0F ; 2HC CHRN(80,2,15,2)
+	db 7, 14, 0
+	dw 0x4F12 ; 2HD CHRN(80,2,18,2)
+	db 9, 14, 0
+	db 0
+
+_dummy_path	db 3, "//A"
 
 
 	alignb 16

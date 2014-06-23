@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Z - Shell interface
+;;	MEG-OS Z - BDOS interface
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
@@ -880,13 +880,15 @@ _loop:
 	int 0x3F
 
 	mov ax, dx
-	cmp ax, 'ZM' ; DOS EXEC
+	cmp ax, 'ZM' ; DOS EXE FORMAT
 	jz short .bad_magic
-	cmp ax, 'MZ' ; DOS EXEC
+	cmp ax, 'MZ' ; DOS EXE FORMAT
+	jz short .bad_magic
+	cmp ax, '#!' ; shebang
 	jz short .bad_magic
 	cmp al, 0xC9 ; INVALID
 	jz short .bad_magic
-	cmp al, 0xC3 ; VALID BAD SILENT
+	cmp al, 0xC3 ; SILENT
 	jz short .magic_silent
 
 	mov dx, ds
@@ -916,7 +918,7 @@ _loop:
 	mov dx, bad_magic_found_msg
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
-	jmp _BDOS_00
+	;jmp _BDOS_00
 
 .magic_silent:
 	jmp _BDOS_00
@@ -1166,34 +1168,6 @@ _cmd_type:
 	ret
 
 
-%if 1
-_disp_hex_16:
-	mov cl, 4
-	jmp short _disp_hex
-_disp_hex_8:
-	mov dh, dl
-	mov cl, 2
-	jmp short _disp_hex
-_disp_hex:
-	mov ch, 0
-	push bx
-.loop:
-	push cx
-	mov cl, 4
-	rol dx, cl
-	mov bx, dx
-	and bx, byte 0x000F
-	mov al, [_hex_tbl+bx]
-	int 0x29
-	pop cx
-	loop .loop
-	pop bx
-	ret
-
-_hex_tbl	db "0123456789abcdef"
-%endif
-
-
 _strlen:
 	push cx
 	push si
@@ -1238,7 +1212,7 @@ cmd_table:
 
 
 ver_msg:
-	db "OSZ ver 0.0.4", 10, 0
+	db "MEG-OSZ ver 0.0.4", 10, 0
 
 bad_cmd_msg:
 	db "Bad command or file name", 10, 0

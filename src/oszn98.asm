@@ -70,6 +70,14 @@ saved_irq00	dd 0
 cons_cursor	dw 0, 0xA000
 cons_scroll	dw 160*24
 
+current_fd_c_r:
+current_fd_r	db 0
+current_fd_c	db 0
+
+current_pda	db 0
+
+			db 0 ; PADDING
+
 _bios_table:
 	dw _bios_const
 	dw _bios_conin
@@ -311,11 +319,18 @@ _bios_dispose:
 
 
 _bios_init_disk:
+
 	mov ax, 0x0330
 	int 0x1B
 	mov ax, 0x0730
 	int 0x1B
-	mov ax, 0x0001
+
+	;; TODO
+	mov al, 0x30
+	mov [cs:current_pda], al
+	mov ax, 0x4F12
+	mov [cs:current_fd_c_r], ax
+
 	ret
 
 
@@ -330,8 +345,7 @@ _bios_fd_read:
 	push ax
 	push cx
 	
-	mov cl, 18
-	div cl
+	div byte [cs:current_fd_c_r]
 	mov dl, ah
 	xor dh, dh
 	inc dx
@@ -340,7 +354,8 @@ _bios_fd_read:
 	adc dh, 0
 	mov ch, 0x02
 	mov bx, 0x0200
-	mov ax, 0x5630
+	mov al, [cs:current_pda]
+	mov ah, 0x56
 	int 0x1B
 	
 	pop cx
