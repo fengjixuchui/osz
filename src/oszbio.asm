@@ -434,8 +434,6 @@ crt:
 	mov al, 13
 	int 0x29
 	
-	call _bios_init_disk
-	
 	mov ax, (_END_RESIDENT-_HEAD)/16
 	retf
 	

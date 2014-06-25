@@ -578,7 +578,15 @@ _crt:
 	stosw
 	mov ax, cs
 	stosw
-	mov di, 0x04*4
+	mov ax, _int01
+	stosw
+	mov ax, cs
+	stosw
+	add di, byte 4 ; INT 2 - NMI
+	mov ax, _int03
+	stosw
+	mov ax, cs
+	stosw
 	mov ax, _int04
 	stosw
 	mov ax, cs
@@ -646,6 +654,14 @@ _int27: ; DOS1+ TERMINATE AND STAY RESIDENT
 
 _int00: ; INTEGER DIVIDE BY ZERO
 	mov dx, int00_msg
+	jmp short _abort_w_msg
+
+_int01: ; DEBUG FAULT
+	mov dx, int01_msg
+	jmp short _abort_w_msg
+
+_int03: ; BREAK POINT
+	mov dx, int03_msg
 	jmp short _abort_w_msg
 
 _int04: ; INTO DETECTED OVERFLOW
@@ -1212,7 +1228,7 @@ cmd_table:
 
 
 ver_msg:
-	db "MEG-OSZ ver 0.0.4", 10, 0
+	db "MEG OSZ ver 0.0.4", 10, 0
 
 bad_cmd_msg:
 	db "Bad command or file name", 10, 0
@@ -1223,8 +1239,9 @@ bad_magic_found_msg:
 nofile_msg:
 	db "No such file or directory", 10, 0
 
-int00_msg	db 10, "#DIV/0!", 10, 0
-
+int00_msg	db 10, "#DIV ERROR", 10, 0
+int01_msg	db 10, "#DEBUG", 10, 0
+int03_msg	db 10, "#BREAKPOINT", 10, 0
 int04_msg	db 10, "#OVERFLOW", 10, 0
 
 

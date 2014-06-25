@@ -73,10 +73,11 @@ cons_scroll	dw 160*24
 current_fd_c_r:
 current_fd_r	db 0
 current_fd_c	db 0
+current_fd_n	db 0
+current_pda		db 0
+current_sector_byte	dw 0
+current_sector_para	dw 0
 
-current_pda	db 0
-
-			db 0 ; PADDING
 
 _bios_table:
 	dw _bios_const
@@ -319,18 +320,70 @@ _bios_dispose:
 
 
 _bios_init_disk:
+	push cs
+	pop ds
 
-	mov ax, 0x0330
+	; 2HD 1440KB (80,2,18,2)
+	xor cx, cx
+	xor dx, dx
+	mov ax, 0x7A30
 	int 0x1B
-	mov ax, 0x0730
+	jc .no_144
+
+	mov ch, 2
+	mov dx, 0x4F12
+	jmp short .continue
+
+.no_144:
+
+	; 2HD
+	xor cx, cx
+	xor dx, dx
+	mov ax, 0x7A90
 	int 0x1B
+	jc .no_2HD
 
-	;; TODO
-	mov al, 0x30
-	mov [cs:current_pda], al
-	mov ax, 0x4F12
-	mov [cs:current_fd_c_r], ax
+	cmp ch, 2
+	jz short .found_2HC
 
+	mov dx, 0x4C08
+	jmp short .continue
+
+.found_2HC:
+	mov dx, 0x4F0F
+	jmp short .continue
+
+.no_2HD:
+
+	; 2DD
+	xor cx, cx
+	xor dx, dx
+	mov ax, 0x7A10
+	int 0x1B
+	jc .no_2DD
+
+	mov dx, 0x4F09
+	jmp short .continue
+
+.no_2DD:
+	mov ax, 1
+	ret
+
+
+.continue:
+	mov [current_pda], al
+	mov [current_fd_n], ch
+	mov [current_fd_c_r], dx
+
+	mov cl, ch
+	mov dx, 128
+	shl dx, cl
+	mov [current_sector_byte], dx
+	mov cl, 4
+	shr dx, cl
+	mov [current_sector_para], dx
+
+	mov ax, [current_fd_c_r]
 	ret
 
 
@@ -341,20 +394,22 @@ _bios_fd_read:
 	mov ax,[si+0x08]
 	les bp,[si+0x04]
 	mov cx,[si+0x02]
+	push cs
+	pop ds
 .loop:	
 	push ax
 	push cx
 	
-	div byte [cs:current_fd_c_r]
+	div byte [current_fd_c_r]
 	mov dl, ah
 	xor dh, dh
 	inc dx
 	mov cl, al
 	shr cl, 1
 	adc dh, 0
-	mov ch, 0x02
-	mov bx, 0x0200
-	mov al, [cs:current_pda]
+	mov ch, [current_fd_n]
+	mov bx, [current_sector_byte]
+	mov al, [current_pda]
 	mov ah, 0x56
 	int 0x1B
 	
@@ -366,7 +421,7 @@ _bios_fd_read:
 	jz short .end
 	inc di
 	mov dx, es
-	add dx, 0x20
+	add dx, [current_sector_para]
 	mov es, dx
 	inc ax
 	jmp short .loop
@@ -496,6 +551,7 @@ crt:
 	mov [es:bx + OSZ_SYSTBL_MEMPROT], ax
 .no_extmem:
 
+%if 0
 	; setup 640x480
 	mov al, [es:0x045C]
 	test al, 0x40
@@ -521,10 +577,10 @@ crt:
 	mov [cons_scroll], word 160*29
 
 .no_pegc:
+%endif
 
 	; misc
 	call _bios_cls
-	call _bios_init_disk
 	
 	mov ax, (_END_RESIDENT-_HEAD)/16
 	retf

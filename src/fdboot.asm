@@ -46,6 +46,7 @@ _HEAD:
 	dw 18
 	dw 2
 %else
+%if 1
 	; 2DD 720KB
 	dw 0x0200
 	db 2
@@ -57,6 +58,19 @@ _HEAD:
 	dw 3
 	dw 9
 	dw 2
+%else
+	; 2HD 1232KB
+	dw 0x0400
+	db 1
+	dw 1
+	db 2
+	dw 0x00C0
+	dw 1232
+	db 0xFE
+	dw 2
+	dw 8
+	dw 2
+%endif
 %endif
 	times 10 db 0
 	db 0x29

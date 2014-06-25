@@ -33,6 +33,7 @@
 %define	_fat12_fat_buffer	(_END)
 ;;	MAX 8KB
 %define	_fat12_dir_buffer	(_END+0x1200)
+%define	MAX_BUFFER			0x3200
 ;;	MAX 256B
 %define	_dir_buff			(_END+0x3200)
 
@@ -52,7 +53,7 @@ _crt:
 
 	mov ah, BIOS_INIT_DISK
 	call _call_bios
-	or al, al
+	or ax, ax
 	jnz .install_ok
 	xor ax, ax
 	retf
@@ -93,6 +94,11 @@ _fat12_init:
 	push si
 	push di
 
+	xor ax, ax
+	mov di, _fat12_fat_buffer
+	mov cx, MAX_BUFFER/2
+	rep stosw
+
 	mov ah, BIOS_INIT_DISK
 	call _call_bios
 	mov dx, ax
@@ -101,18 +107,18 @@ _fat12_init:
 	mov di, _current_disk_id
 .find_bpb:
 	lodsw
-	or ax, ax
+	or al, al
 	jz .invalid_bpb
 	cmp ax, dx
 	jz short .found_bpb
-	add si, byte 3
+	add si, byte 4
 	jmp short .find_bpb
 .invalid_bpb:
 	stosw
 	stosw
 	stosw
 	stosw
-	stosb
+	stosw
 	mov [_n_root_entries], ax
 	jmp _end_init
 
@@ -128,7 +134,19 @@ _fat12_init:
 	stosw
 	add ax, cx
 	stosw
-	movsb
+	lodsw
+	stosw
+	add al, ah
+	mov cl, al
+	mov ax, 128
+	shl ax, cl
+	stosw
+	mov cl, 4
+	shr ax, cl
+	stosw
+
+	xor ax, ax
+	stosw
 
 .end_bpb:
 
@@ -136,33 +154,44 @@ _fat12_init:
 	mov [si+8], word 1
 	mov [si+6], cs
 	mov [si+4], word _fat12_fat_buffer
+	xor ah, ah
 	mov al, [_n_sectors_fat]
-	mov [si+2], al
+	mov [si+2], ax
 	mov ah, BIOS_READ_DISK
 	call _call_bios
 
+
+	mov di, [_n_sectors_root_dir]
 	mov ax, [_begin_root_dir]
 	mov [si+8], ax
 	mov [si+4], word _fat12_dir_buffer
-	mov al, [_n_sectors_root_dir]
-	mov [si+2], al
+	mov [si+2], byte 1
+.loop_read_root:
 	mov ah, BIOS_READ_DISK
 	call _call_bios
 
-	;	scan number of entries of root dir
-_scan_root:
-	mov cx, 0xE0 ; number of entries of root dir
-	xor dx,dx
-	mov si, _fat12_dir_buffer
-.loop:
-	lodsb
-	or al,al
-	jz .end
-	inc dx
-	add si, byte 31
-	loop .loop
-.end:
-	mov [_n_root_entries], dx
+	mov cl, [_sector_shift]
+	mov bx, [si+4]
+	mov dx, 4
+	shl dx, cl
+	xor al, al
+.loop_scan_root:
+	cmp [bx], al
+	jz .end_scan_root
+	inc word [_n_root_entries]
+	add bx, byte 32
+	dec dx
+	jnz .loop_scan_root
+
+	dec di
+	jz .end_scan_root
+	inc word [si+8]
+	mov ax, 128
+	shl ax, cl
+	add [si+4], ax
+	jmp .loop_read_root
+
+.end_scan_root:
 
 _end_init:
 	pop di
@@ -492,11 +521,16 @@ _fat12_read:
 	mov ax, [cs:si + 0x1C]
 	mov di, [cs:si + 0x1E]
 	mov [bp-2], ax
-	add ax, 0x01FF
+	mov cx, [cs:_clst_byte]
+	dec cx
+	add ax, cx
 	adc di, byte 0
-	mov cl, 9
-	shr ax, cl
 	mov cl, 7
+	add cl, [cs:_sector_shift]
+	add cl, [cs:_cluster_shift]
+	shr ax, cl
+	neg cl
+	add cl, 16
 	shl di, cl
 	or di, ax
 	jz short .end_z
@@ -517,15 +551,14 @@ _fat12_read:
 	push cs
 	pop ds
 
-	mov cl, [cs:_cluster_shift]
+	mov cl, [_cluster_shift]
 	mov ax, bx
-	shr di, cl
-	adc di, 0
 .loop:
 
-	sub ax, byte 2
+	dec ax
+	dec ax
 	shl ax, cl
-	add ax, [cs:_begin_clust_2]
+	add ax, [_begin_clust_2]
 	mov [si+8],ax
 
 	mov ax, 1
@@ -535,8 +568,7 @@ _fat12_read:
 	mov ah, BIOS_READ_DISK
 	call _call_bios
 
-	mov ax, 0x0020
-	shl ax, cl
+	mov ax, [_clst_para]
 	add [si+6], ax
 
 	dec di
@@ -602,8 +634,10 @@ _n_sectors_fat		db 0
 _n_sectors_root_dir	db 0
 _begin_root_dir		dw 0
 _begin_clust_2		dw 0
+_sector_shift		db 0
 _cluster_shift		db 0
-					db 0 ; PADDING
+_clst_byte			dw 0
+_clst_para			dw 0
 _n_root_entries		dw 0
 
 _IFS_func_tbl:
@@ -617,15 +651,18 @@ _IFS_func_tbl:
 	dw _fat12_enum_file
 
 
+	; Compressed internal BPB
 _bpb_table:
-	dw 0x2708 ; 2D CHRN(40,2,9,2)
-	db 2, 7, 1
-	dw 0x4F09 ; 2DD CHRN(80,2,9,2)
-	db 3, 7, 1
-	dw 0x4F0F ; 2HC CHRN(80,2,15,2)
-	db 7, 14, 0
-	dw 0x4F12 ; 2HD CHRN(80,2,18,2)
-	db 9, 14, 0
+	dw 0x2709 ; 2D CHRN(40,2,9,2) 360KB
+	db 2, 7, 2, 1
+	dw 0x4F09 ; 2DD CHRN(80,2,9,2) 720KB
+	db 3, 7, 2, 1
+	dw 0x4F0F ; 2HC CHRN(80,2,15,2) 1200KB
+	db 7, 14, 2, 0
+	dw 0x4F12 ; 2HD CHRN(80,2,18,2) 1440KB
+	db 9, 14, 2, 0
+	dw 0x4C08 ; 2HD CHRN(77,2,8,3) 1232KB
+	db 2, 6, 3, 0
 	db 0
 
 _dummy_path	db 3, "//A"

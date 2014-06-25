@@ -33,6 +33,7 @@
 
 %define	SIZE_BSS	0
 
+
 [bits 16]
 _HEAD:
 	db 0xC3, 0x5A
@@ -70,10 +71,12 @@ _int3F_old	dd 0
 %define	LOCAL_FOR_NEST_MAX	-12
 %define	LOCAL_FOR_NEST_COUNT	-14
 %define	LOCAL_MAX_LABEL		-16
+%define	LOCAL_START_BC		-18
+%define	LOCAL_END_BC	-20
 _MAGIC_WORD_HANDLER:
 	push bp
 	mov bp, sp
-	sub sp, 16
+	sub sp, 24
 	mov [bp+LOCAL_APP_SRC_SEG], ds
 	mov [bp+LOCAL_APP_SRC_SIZE], cx
 
@@ -102,18 +105,81 @@ _MAGIC_WORD_HANDLER:
 	xor di, di
 
 	lodsw
+	mov [bp+LOCAL_START_BC], si
+	mov [bp+LOCAL_END_BC], cx
 
+
+	; PRE PROCESS
+_pre_inst_loop:
+	mov [bp+LOCAL_APP_LAST_ADDR], si
+	lodsb
+
+	; LABEL
+	cmp al, 0x01
+	jnz .no_01
+	inc word [bp+LOCAL_MAX_LABEL]
+	jmp short _end_pre_inst
+.no_01:
+
+	; FOR r0, r1
+	cmp al, 0x06
+	jnz .no_06
+	mov ax, [bp+LOCAL_FOR_NEST_COUNT]
+	inc ax
+	mov [bp+LOCAL_FOR_NEST_COUNT], ax
+	cmp ax, [bp+LOCAL_FOR_NEST_MAX]
+	jbe _end_pre_inst
+	inc word [bp+LOCAL_FOR_NEST_MAX]
+	jmp short _end_pre_inst
+.no_06:
+
+	; END FOR
+	cmp al, 0x07
+	jnz .no_07
+	dec word [bp+LOCAL_FOR_NEST_COUNT]
+	jns short _end_pre_inst
+	jmp _for_err
+.no_07:
+
+	; LDC rd, i8
+	cmp al, 0x40
+	jb .no_40
+	cmp al, 0x43
+	ja .no_40
+	inc si
+	jmp short _end_pre_inst
+.no_40:
+
+	; LDC rd, i16
+	cmp al, 0x44
+	jb .no_44
+	cmp al, 0x47
+	ja .no_44
+	inc si
+	inc si
+	jmp short _end_pre_inst
+.no_44:
+
+	; TODO: CHECK OTHER BC
+
+_end_pre_inst:
+	cmp si, [bp+LOCAL_END_BC]
+	jb short _pre_inst_loop
+
+
+	; JIT COMPILE MAIN
+	mov si, [bp+LOCAL_START_BC]
 _inst_loop:
-	mov [bp+ LOCAL_APP_LAST_ADDR], si
+	mov [bp+LOCAL_APP_LAST_ADDR], si
 	lodsb
 	mov bl, al
 	add bl, bl
 	jc .inv_bc
 	xor bh, bh
 	call [cs:_op_table+bx]
-	cmp cx, si
+	cmp si, [bp+LOCAL_END_BC]
 	je short _end_jit
-	jb short _bytecode_overflow
+	ja short _bytecode_overflow
 	jmp short _inst_loop
 .inv_bc:
 	jmp _inv_bc
@@ -204,7 +270,6 @@ _end_jit:
 
 
 _op01:	; label
-	inc word [bp+LOCAL_MAX_LABEL]
 	ret
 
 
@@ -212,7 +277,6 @@ _op06:	; for r0, r1
 	mov [cs:_for_addr], di
 	mov al, 0xC8
 	mov [cs:_for_regs], al
-	inc word [bp+LOCAL_FOR_NEST_COUNT]
 	ret
 
 
@@ -234,8 +298,6 @@ _op07:	; end for
 	stosb
 	mov al, bl
 	stosb
-
-	dec word [bp+LOCAL_FOR_NEST_COUNT]
 
 	ret
 
@@ -282,6 +344,16 @@ _op12:	; mul rd, rn
 _op13:	; div rd, rn
 _op14:	; rem rd, rn
 
+_op18:	; SHL rd, rn
+_op19:	; ASR rd, rn
+
+_op20:	; IFEQ rd, rn, disp
+_op21:	; IFNE rd, rn, disp
+_op22:	; IFLT rd, rn, disp
+_op23:	; IFGE rd, rn, disp	
+_op24:	; CBZ rd, disp
+_op25:	; CBNZ rd, disp
+
 _op02:
 _op03:
 _op04:
@@ -293,20 +365,12 @@ _op0B:
 _op0C:
 _op0D:
 _op0F:
-_op18:
-_op19:
 _op1A:
 _op1B:
 _op1C:
 _op1D:
 _op1E:
 _op1F:
-_op20:
-_op21:
-_op22:
-_op23:
-_op24:
-_op25:
 _op26:
 _op27:
 _op28:
@@ -408,6 +472,19 @@ _inv_bc:
 	int 0x20
 
 
+_for_err:
+	push cs
+	pop ds
+	mov dx, for_err_msg
+	mov ah, OSZ_DOS_PUTS
+	call _call_bdos
+	mov dx, [bp+LOCAL_APP_LAST_ADDR]
+	sub dx, 0x100
+	call _disp_hex_16
+
+	int 0x20
+
+
 
 
 _disp_hex_16:
@@ -444,14 +521,6 @@ _op_table:
 	dw _op50,_op51,_op52,_op53,_op54,_op55,_op56,_op57,_op58,_op59,_op5A,_op5B,_op5C,_op5D,_op5E,_op5F,
 	dw _op60,_op61,_op62,_op63,_op64,_op65,_op66,_op67,_op68,_op69,_op6A,_op6B,_op6C,_op6D,_op6E,_op6F,
 	dw _op70,_op71,_op72,_op73,_op74,_op75,_op76,_op77,_op78,_op79,_op7A,_op7B,_op7C,_op7D,_op7E,_op7F,
-	;dw _op80,_op81,_op82,_op83,_op84,_op85,_op86,_op87,_op88,_op89,_op8A,_op8B,_op8C,_op8D,_op8E,_op8F,
-	;dw _op90,_op91,_op92,_op93,_op94,_op95,_op96,_op97,_op98,_op99,_op9A,_op9B,_op9C,_op9D,_op9E,_op9F,
-	;dw _opA0,_opA1,_opA2,_opA3,_opA4,_opA5,_opA6,_opA7,_opA8,_opA9,_opAA,_opAB,_opAC,_opAD,_opAE,_opAF,
-	;dw _opB0,_opB1,_opB2,_opB3,_opB4,_opB5,_opB6,_opB7,_opB8,_opB9,_opBA,_opBB,_opBC,_opBD,_opBE,_opBF,
-	;dw _opC0,_opC1,_opC2,_opC3,_opC4,_opC5,_opC6,_opC7,_opC8,_opC9,_opCA,_opCB,_opCC,_opCD,_opCE,_opCF,
-	;dw _opD0,_opD1,_opD2,_opD3,_opD4,_opD5,_opD6,_opD7,_opD8,_opD9,_opDA,_opDB,_opDC,_opDD,_opDE,_opDF,
-	;dw _opE0,_opE1,_opE2,_opE3,_opE4,_opE5,_opE6,_opE7,_opE8,_opE9,_opEA,_opEB,_opEC,_opED,_opEE,_opEF,
-	;dw _opF0,_opF1,_opF2,_opF3,_opF4,_opF5,_opF6,_opF7,_opF8,_opF9,_opFA,_opFB,_opFC,_opFD,_opFE,_opFF,
 
 
 _for_addr	dw 0

@@ -1,4 +1,3 @@
-#! /usr/bin/rake
 # -*- coding: utf-8 -*-
 #
 # Rakefile for OSZ
@@ -6,7 +5,6 @@
 #
 require 'rake/clean'
 require 'rake/packagetask'
-#require 'yaml'
 
 CC		= "clang -Os"
 AS		= "yasm -s"
@@ -28,9 +26,7 @@ PATH_OS_SYS 	= "#{PATH_OUTPUT}osz.sys"
 SRCS = FileList["**/*.c"] << FileList["**/*.cpp"] << FileList["**/*.asm"]
 OBJS = SRCS.ext('o')
 
-CLEAN.include(OBJS)
-CLOBBER.include(FileList["bin/**/*"])
-
+CLEAN.include(FileList["#{PATH_OUTPUT}/**/*"])
 
 directory PATH_OUTPUT
 
@@ -87,6 +83,14 @@ namespace :tools do
 
 end
 
+def make_disk(output, ipl, files)
+  file output => [ PATH_CATARC, ipl, files].flatten do |t|
+    #sh "#{ PATH_CATARC } --force-lfn --no-ntreserved --bs #{ ipl } #{ t.name } '#{ files.join("' '") }'"
+    sh "#{ PATH_CATARC } --bs #{ ipl } #{ t.name } '#{ files.join("' '") }'"
+  end
+end
+
+
 ####
 # OSZ
 namespace :osz do
@@ -105,7 +109,7 @@ namespace :osz do
   EXTRAS = [
     "#{PATH_SRC}hello.asm",
     FileList["extras/*"]
-  ].flatten
+    ].flatten
 
   # tfdisk
   PATH_TFDISK_SRC = "#{ PATH_SRC }tfdisk/tfdisk.asm"
@@ -126,12 +130,12 @@ namespace :osz do
 
   file PATH_TFDISK_BIN => [PATH_TFDISK_SRC, PATH_TFMBR_BIN, PATH_EXIPL_BIN, PATH_IPL16_BIN, PATH_IPL32_BIN] do |t|
     sh ["#{ AS } #{ AFLAGS } -i #{ PATH_SRC} -o #{t.name}",
-        "-DPATH_MBR=\\\"#{File.expand_path(PATH_TFMBR_BIN)}\\\"",
-        "-DPATH_EXIPL=\\\"#{File.expand_path(PATH_EXIPL_BIN)}\\\"",
-        "-DPATH_IPL16=\\\"#{File.expand_path(PATH_IPL16_BIN)}\\\"",
-        "-DPATH_IPL32=\\\"#{File.expand_path(PATH_IPL32_BIN)}\\\"",
-        PATH_TFDISK_SRC].join(' ')
-  end
+      "-DPATH_MBR=\\\"#{File.expand_path(PATH_TFMBR_BIN)}\\\"",
+      "-DPATH_EXIPL=\\\"#{File.expand_path(PATH_EXIPL_BIN)}\\\"",
+      "-DPATH_IPL16=\\\"#{File.expand_path(PATH_IPL16_BIN)}\\\"",
+      "-DPATH_IPL32=\\\"#{File.expand_path(PATH_IPL32_BIN)}\\\"",
+      PATH_TFDISK_SRC].join(' ')
+    end
 
   # kernel
   OSZ_MODS = %w(osz2boot oszbio oszn98 fat12 oszre oszdos).collect do |t|
@@ -157,9 +161,9 @@ namespace :osz do
 
   # fd image
   ROOT_FILES = [PATH_OS_SYS, APPS, EXTRAS].flatten.sort {|a, b| File.basename(a).upcase <=> File.basename(b).upcase }
-  file PATH_BOOT_FLP => [ PATH_FDBOOT_IPL, ROOT_FILES].flatten do |t|
-    sh "#{ PATH_CATARC } --bs #{ PATH_FDBOOT_IPL } #{ t.name } '#{ ROOT_FILES.join("' '") }'"
-  end
+  make_disk(PATH_BOOT_FLP, PATH_FDBOOT_IPL, ROOT_FILES)
 
 end
+
+
 
