@@ -51,6 +51,7 @@ _crt:
 	mov [_osz_systbl], bx
 	mov [_osz_systbl+2], es
 
+%if 0
 	mov ah, BIOS_INIT_DISK
 	call _call_bios
 	or ax, ax
@@ -58,9 +59,18 @@ _crt:
 	xor ax, ax
 	retf
 .install_ok:
+%endif
 
-	mov [es:bx+OSZ_SYSTBL_IFS], word _fat12_ifs
-	mov [es:bx+OSZ_SYSTBL_IFS+2], cs
+	xor ax, ax
+	mov es, ax
+	mov bx, 0x3F*4
+	
+	mov ax, [es:bx]
+	mov cx, [es:bx+2]
+	mov [_int3F_old], ax
+	mov [_int3F_old+2], cx
+	mov [es:bx], word _int3F
+	mov [es:bx+2], cs
 
 	call _fat12_init
 	
@@ -74,15 +84,18 @@ _osz_systbl	dd 0
 	ret
 
 
-_fat12_ifs:
+_int3F:
+	cmp ah, OSZ_I3F_IFS
+	jz _int3F_ifs
+	db 0xEA
+_int3F_old	dd 0
+
+_int3F_ifs:
 	xchg ax, bx
-	mov bl, bh
 	xor bh, bh
-	sub bl, OSZ_DOS_IFS
 	add bx, bx
 	call [cs:_IFS_func_tbl + bx]
-	retf
-
+	iret
 
 
 _fat12_init:
@@ -145,9 +158,6 @@ _fat12_init:
 	shr ax, cl
 	stosw
 
-	xor ax, ax
-	stosw
-
 .end_bpb:
 
 	mov si, _fat12_packet
@@ -160,38 +170,29 @@ _fat12_init:
 	mov ah, BIOS_READ_DISK
 	call _call_bios
 
-
-	mov di, [_n_sectors_root_dir]
 	mov ax, [_begin_root_dir]
 	mov [si+8], ax
 	mov [si+4], word _fat12_dir_buffer
-	mov [si+2], byte 1
-.loop_read_root:
+	xor ah, ah
+	mov al, [_n_sectors_root_dir]
+	mov [si+2], ax
 	mov ah, BIOS_READ_DISK
 	call _call_bios
 
-	mov cl, [_sector_shift]
-	mov bx, [si+4]
-	mov dx, 4
-	shl dx, cl
-	xor al, al
-.loop_scan_root:
-	cmp [bx], al
-	jz .end_scan_root
-	inc word [_n_root_entries]
-	add bx, byte 32
-	dec dx
-	jnz .loop_scan_root
-
-	dec di
-	jz .end_scan_root
-	inc word [si+8]
-	mov ax, 128
-	shl ax, cl
-	add [si+4], ax
-	jmp .loop_read_root
-
-.end_scan_root:
+	;	scan number of entries of root dir
+_scan_root:
+	mov cx, 0xE0 ; number of entries of root dir
+	xor dx,dx
+	mov si, _fat12_dir_buffer
+.loop:
+	lodsb
+	or al,al
+	jz .end
+	inc dx
+	add si, byte 31
+	loop .loop
+.end:
+	mov [_n_root_entries], dx
 
 _end_init:
 	pop di
@@ -551,9 +552,9 @@ _fat12_read:
 	push cs
 	pop ds
 
-	mov cl, [_cluster_shift]
 	mov ax, bx
 .loop:
+	mov cl, [_cluster_shift]
 
 	dec ax
 	dec ax
@@ -575,8 +576,17 @@ _fat12_read:
 	je short .end_s
 
 	mov ax, bx
-	call _fat12_next
+	add ax, ax
+	add bx, ax
+	shr bx, 1
+	mov ax, [_fat12_fat_buffer + bx]
+	jnc .even
+	mov cl, 4
+	shr ax, cl
+.even:
+	and ax, 0x0FFF
 	mov bx, ax
+
 	jmp short .loop
 
 .end_s:
@@ -587,24 +597,6 @@ _fat12_read:
 .end:
 	mov sp, bp
 	pop bp
-	ret
-
-
-_fat12_next:
-	push bx
-	push cx
-	mov bx, ax
-	add ax, ax
-	add bx, ax
-	shr bx, 1
-	mov ax, [cs:_fat12_fat_buffer + bx]
-	jnc .even
-	mov cl, 4
-	shr ax, cl
-.even:
-	and ax, 0x0FFF
-	pop cx
-	pop bx
 	ret
 
 
@@ -622,6 +614,17 @@ _to_lower:
 
 	alignb 16
 
+_IFS_func_tbl:
+	dw _fat12_get_cwd
+	dw _fat12_nop ; set cwd
+	dw _fat12_open
+	dw _fat12_nop; close
+	dw _fat12_read; read
+	dw _fat12_nop; write
+	dw _fat12_nop; seek
+	dw _fat12_enum_file
+
+
 _fat12_packet:
 	db 0x10, 0x00
 	dw 0x0001
@@ -629,6 +632,7 @@ _fat12_packet:
 	dd 0, 0
 
 
+	; internal BPB
 _current_disk_id	dw 0
 _n_sectors_fat		db 0
 _n_sectors_root_dir	db 0
@@ -639,16 +643,6 @@ _cluster_shift		db 0
 _clst_byte			dw 0
 _clst_para			dw 0
 _n_root_entries		dw 0
-
-_IFS_func_tbl:
-	dw _fat12_get_cwd
-	dw _fat12_nop ; set cwd
-	dw _fat12_open
-	dw _fat12_nop; close
-	dw _fat12_read; read
-	dw _fat12_nop; write
-	dw _fat12_nop; seek
-	dw _fat12_enum_file
 
 
 	; Compressed internal BPB

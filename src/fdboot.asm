@@ -1,30 +1,9 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Boot Sector
+;;	Floppy Boot Sector for OSZ
 ;;
-;;	Copyright (c) 1998-2014, MEG-OS project
-;;	All rights reserved.
-;;	
-;;	Redistribution and use in source and binary forms, with or without modification, 
-;;	are permitted provided that the following conditions are met:
-;;	
-;;	* Redistributions of source code must retain the above copyright notice, this
-;;	  list of conditions and the following disclaimer.
-;;	
-;;	* Redistributions in binary form must reproduce the above copyright notice, this
-;;	  list of conditions and the following disclaimer in the documentation and/or
-;;	  other materials provided with the distribution.
-;;	
-;;	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-;;	ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-;;	WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-;;	DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-;;	ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-;;	(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-;;	LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-;;	ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-;;	(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-;;	SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+;;	PUBLIC DOMAIN
+;;	First Written by 1998-2014 MEG-OS project
 ;;
 
 [bits 16]
@@ -32,7 +11,8 @@
 _HEAD:
 	jmp short main
 	nop
-	db "IPL4MEG "
+	db "IPL4OSZ "
+	; TODO: swith bpb
 %if 1
 	; 2HD 1440KB
 	dw 0x0200
@@ -72,15 +52,21 @@ _HEAD:
 	dw 2
 %endif
 %endif
-	times 10 db 0
+
+;;  Variables
+fat2    dw 0	; 2
+_arch   db 0	; 1
+__PDA   db 0	; 1
+__N     db 0	; 1
+_clust_sft	db 0	; 1
+
+	times 0x26 - ($-$$) db 0
+
 	db 0x29
 	dd 0xFFFFFFFF
 	;;  123456789AB
-	db "MEGOS      "
+	db "OSZ        "
 	db "FAT12   "
-
-        ;;  FILENAMEEXT
-sysname db "OSZ     SYS"
 
 main:
 
@@ -100,7 +86,7 @@ main:
 	ja short initFMT
 	jz short init98
 
-	;	PC
+	;	IBM PC
 initAT:
 	mov ax,(main0-_HEAD)
 	push ax
@@ -114,7 +100,7 @@ main0:
 	int 0x13
 	jmp short _next
 
-	;	TOWNS
+	;	FM TOWNS
 initFMT:
 	push cs
 	pop ds
@@ -123,7 +109,7 @@ initFMT:
 	mov [di], ax
 	jmp short init2
 
-	;	PC98
+	;	NEC PC-98
 init98:
 	push cs
 	pop ds
@@ -157,8 +143,6 @@ _next:
 	jmp .loop_clst_sft
 .end:
 	mov [_clust_sft], dl
-
-	;db 0xD6
 
 	;; read Root DIR
 	mov ax, [0x0011]
@@ -241,6 +225,7 @@ force:
 _retf:
 	retf
 
+
 	;; disk read
 diskread:
 	xchg ax, cx
@@ -312,14 +297,12 @@ forever:
 	jmp short $
 
 
-;;  Variables
-fat2    dw 0
-_arch   db 0
-__PDA   db 0
-__N     db 0
-_clust_sft	db 0
 
-	times 0x01FE-($-$$) db 0
+
+        ;;  FILENAMEEXT
+sysname db "OSZ     SYS"
+
+	times 0x01FE - ($-$$) db 0
 	db 0x55, 0xAA
 
 end

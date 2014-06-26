@@ -919,7 +919,7 @@ scale_table:
 
 crlf				db 10
 null_string			db 0
-bad_pc_msg			db "This version of TFDISK cannot run on this computer", 10, 0
+bad_pc_msg			db "This version of TFDISK cannot be run on this computer", 10, 0
 _banner				db " + TinyFDISK for OSZ + WARNING: THIS IS ALPHA VERSION. VERY DANGEROUS!",10
 					db 10,"Drive:",0
 mbr_badmbr_msg		db " BADMBR",0

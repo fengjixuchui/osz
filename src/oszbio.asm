@@ -117,7 +117,7 @@ _bios_entry:
 	add bx, bx
 	call [cs:_bios_table + bx]
 
-	lea sp, [bp+2]
+	add sp, byte 2
 	pop cx
 	pop dx
 	pop bx
@@ -239,11 +239,6 @@ _bios_dispose:
 
 
 _bios_init_disk:
-	xor ax, ax
-	xor dl, dl
-	int 0x13
-	jc short .fail
-
 	mov ah, 0x08
 	xor dl, dl
 	int 0x13
@@ -254,7 +249,8 @@ _bios_init_disk:
 	ret
 
 .fail:
-	xor ax, ax
+	;xor ax, ax
+	mov ax, 0x4F12 ; fallback
 	mov [cs:current_fd_c_r], ax
 	ret
 

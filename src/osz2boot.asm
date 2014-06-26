@@ -49,16 +49,8 @@ _int3F:
 	xor ax, ax
 	iret
 
-_dummy_IFS:
-	mov ax, -1
-	retf
 
 _next:
-	mov ax, ds
-	add ax, (_END-_HEAD)/16
-	mov ds, ax
-	mov dx, (ORG_BASE + _END_RESIDENT - _HEAD)/16
-	mov es, dx
 
 .load_loop:
 	push es
@@ -120,15 +112,11 @@ _crt:
 	mov cx, OSZ_SYSTBL_SIZE/2
 	rep stosw
 
+	mov bp, _osz_systbl
 	pop ax
-	mov [es:_osz_systbl + OSZ_SYSTBL_ARCH], ax
-	mov al, 0xEA
-	mov [es:_osz_systbl + OSZ_SYSTBL_CALLBIOS], al
-
-	mov [es:_osz_systbl + OSZ_SYSTBL_IFS], word _dummy_IFS
-	mov [es:_osz_systbl + OSZ_SYSTBL_IFS+2], es
-	
-	mov [es:_osz_systbl + OSZ_SYSTBL_VERSION], word VER_INTEGER
+	mov [bp+OSZ_SYSTBL_ARCH], ax
+	mov [bp+OSZ_SYSTBL_CALLBIOS], byte 0xEA
+	mov [bp+OSZ_SYSTBL_VERSION], word VER_INTEGER
 	
 	mov [es:0x00FC], word _int3F
 	mov [es:0x00FE], es
@@ -205,6 +193,12 @@ _DETECT_CPUID:
 .env_no_cpuid:
 
 .end_cpu:
+
+	mov ax, ds
+	add ax, (_END-_HEAD)/16
+	mov ds, ax
+	mov dx, (ORG_BASE + _END_RESIDENT - _HEAD)/16
+	mov es, dx
 
 	retf
 

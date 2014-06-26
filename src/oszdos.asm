@@ -549,9 +549,13 @@ _BDOS_14:
 _BDOS_15:
 _BDOS_16:
 _BDOS_17:
-	les di, [cs:_osz_systbl]
+	; restore bx
 	mov bx, [bp+STK_BX]
-	call far [es:di+OSZ_SYSTBL_IFS]
+
+	mov al, ah
+	sub al, OSZ_DOS_IFS
+	mov ah, OSZ_I3F_IFS
+	int 0x3F
 	ret
 
 
@@ -955,6 +959,13 @@ _cmd_ver:
 	ret
 
 
+_cmd_uname:
+	mov dx, uname_msg
+	mov ah, OSZ_DOS_PUTS
+	call _BDOS_entry
+	ret
+
+
 _cmd_echo:
 	mov dx,arg_buffer
 	mov ah, OSZ_DOS_PUTS
@@ -1025,17 +1036,18 @@ _disp_dec:
 	push bx
 	push di
 	
-	mov di,numbuff
+	mov di, numbuff
 	mov ax, 0x2020
 	stosw
 	stosw
 	xor ah, ah
 	stosw
-	mov ax, dx
-	xor dx, dx
-	mov cx, 10
+
 	lea bx, [di-2]
+	mov ax, dx
+	mov cx, 10
 .loop_sz:
+	xor dx, dx
 	div cx
 	add dl, '0'
 	mov [bx], dl
@@ -1043,10 +1055,19 @@ _disp_dec:
 	jz .end_sz
 	or ax, ax
 	jz .end_sz
-	xor dx, dx
 	jmp short .loop_sz
 .end_sz:
-	mov dx, numbuff
+
+	mov bx, numbuff
+	mov al, ' '
+.loop_sp:
+	cmp [bx], al
+	jnz short .end_sp
+	inc bx
+	jmp short .loop_sp
+
+.end_sp:
+	mov dx, bx
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	
@@ -1055,12 +1076,6 @@ _disp_dec:
 	pop cx
 	pop es
 	ret
-
-
-mem_1_msg		db "Memory: ", 0
-mem_2_msg		db "/", 0
-mem_prot_msg	db "Extend: ", 0
-mem_kb_msg		db " KB", 10, 0
 
 
 
@@ -1208,22 +1223,24 @@ app_ext:
 	db ".com",0
 
 cmd_table:
-	db 2,"cd"
+	db 2, "cd"
 	dw _cmd_cd
-	db 3,"cls"
+	db 3, "cls"
 	dw _cmd_cls
-	db 3,"dir"
+	db 3, "dir"
 	dw _cmd_dir
-	db 3,"mem"
+	db 3, "mem"
 	dw _cmd_mem
-	db 3,"ver"
+	db 3, "ver"
 	dw _cmd_ver
-	db 4,"echo"
+	db 4, "echo"
 	dw _cmd_echo
-	db 4,"exit"
+	db 4, "exit"
 	dw _cmd_exit
-	db 4,"type"
+	db 4, "type"
 	dw _cmd_type
+	db 5, "uname"
+	dw _cmd_uname
 	db 0
 
 
@@ -1238,6 +1255,14 @@ bad_magic_found_msg:
 
 nofile_msg:
 	db "No such file or directory", 10, 0
+
+uname_msg:
+	db "osz", 10, 0
+
+mem_1_msg		db "Memory: ", 0
+mem_2_msg		db "/", 0
+mem_prot_msg	db "Extend: ", 0
+mem_kb_msg		db " KB", 10, 0
 
 int00_msg	db 10, "#DIV ERROR", 10, 0
 int01_msg	db 10, "#DEBUG", 10, 0
