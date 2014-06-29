@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Z - BIOS for IBM PC
+;;	MEG OSZ - BIOS for IBM PC
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
@@ -178,10 +178,19 @@ _bios_conout:
 
 
 _bios_cls:
+%if 1
 	mov ah, 0x0F
 	int 0x10
 	xor ah, ah
 	int 0x10
+%else
+	mov dx, 0xB800
+	mov es, dx
+	xor di, di
+	mov cx, 4096
+	mov ax, 0x0720
+	rep stosw
+%endif
 	xor bx, bx
 	xor dx, dx
 	mov ah, 0x02

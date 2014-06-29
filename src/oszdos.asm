@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Z - BDOS interface
+;;	MEG OSZ - BDOS Interface
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
@@ -54,7 +54,7 @@
 ;;	16
 %define	numbuff		_BSS + 0x0400
 
-%define	_END		_BSS + 0x0400
+%define	_END		_BSS + 0x0500
 
 %define	STK_AX					0
 %define	STK_CX					2
@@ -242,6 +242,16 @@ _crlf:
 	ret
 
 
+_force_bs:
+	mov al, 8
+	int 0x29
+	mov al, ' '
+	int 0x29
+	mov al, 8
+	int 0x29
+	ret
+
+
 _call_bios:
 	db 0x9A
 _osz_systbl	dd 0
@@ -349,14 +359,7 @@ _BDOS_05:
 	jz short .main_loop
 
 	dec bx
-	
-	mov al, 8
-	int 0x29
-	mov al, ' '
-	int 0x29
-	mov al, 8
-	int 0x29
-	
+	call _force_bs
 	jmp short .loop_esc
 
 .no_esc:
@@ -374,23 +377,9 @@ _BDOS_05:
 	mov al, [si+bx]
 	cmp al, 0x20
 	jnc .bs_printchar
-	
-	mov al, 8
-	int 0x29
-	mov al, ' '
-	int 0x29
-	mov al, 8
-	int 0x29
-
+	call _force_bs
 .bs_printchar:
-
-	mov al, 8
-	int 0x29
-	mov al, ' '
-	int 0x29
-	mov al, 8
-	int 0x29
-	
+	call _force_bs
 	jmp short .main_loop
 
 .no_bs:
@@ -900,6 +889,10 @@ _loop:
 	int 0x3F
 
 	mov ax, dx
+	or ax, ax
+	jz short .bad_magic
+	cmp ax, 0xFFFF
+	jz short .bad_magic
 	cmp ax, 'ZM' ; DOS EXE FORMAT
 	jz short .bad_magic
 	cmp ax, 'MZ' ; DOS EXE FORMAT
@@ -1086,9 +1079,10 @@ _cmd_dir:
 	mov dx, dir_buff
 	mov ah, OSZ_DOS_ENUM_FILE
 	call _BDOS_entry
-	or ax, ax
-	jz short .end
-	js short .end
+	cmp ax, 0
+	jg .continue
+	jmp .end
+.continue:
 	push ax
 
 	mov al, ' '
@@ -1108,6 +1102,54 @@ _cmd_dir:
 	int 0x29
 	loop .loop_fn3
 	mov al, ' '
+	int 0x29
+	int 0x29
+
+	mov dx, [dir_buff+0x18]
+
+	mov ax, dx
+	mov cl, 9
+	shr ax, cl
+	add ax, 1980
+	call _disp_dec_04
+
+	mov al, '-'
+	int 0x29
+
+	mov ax, dx
+	mov cl, 5
+	shr ax, cl
+	and ax, 0x000F
+	call _disp_dec_02
+
+	mov al, '-'
+	int 0x29
+
+	mov ax, dx
+	and ax, 0x001F
+	call _disp_dec_02
+
+	mov al, ' '
+	int 0x29
+
+	mov dx, [dir_buff+0x16]
+
+	mov ax, dx
+	mov cl, 11
+	shr ax, cl
+	call _disp_dec_02
+
+	mov al, ':'
+	int 0x29
+
+	mov ax, dx
+	mov cl, 5
+	shr ax, cl
+	and ax, 0x003F
+	call _disp_dec_02
+
+	mov al, ' '
+	int 0x29
 	int 0x29
 
 	mov cx, 4
@@ -1145,9 +1187,48 @@ _cmd_dir:
 	call _crlf
 	
 	pop bx
-	jmp short .loop
+	jmp .loop
 .end:
 	ret
+
+_disp_dec_02:
+	mov cl, 10
+	div cl
+	or ax, '00'
+	int 0x29
+	xchg al, ah
+	int 0x29
+	ret
+
+_disp_dec_04:
+	push dx
+
+	xor dx, dx
+	mov cx, 1000
+	div cx
+	or al, '0'
+	int 0x29
+
+	mov ax, dx
+	xor dx, dx
+	mov cx, 100
+	div cx
+	or al, '0'
+	int 0x29
+
+	mov ax, dx
+	xor dx, dx
+	mov cl, 10
+	div cl
+	or ax, '00'
+	int 0x29
+	mov al, ah
+	int 0x29
+
+	pop dx
+	ret
+
+
 
 
 _cmd_type:

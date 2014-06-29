@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Z - Minimal FAT12 Driver
+;;	MEG OSZ - Minimal FAT12 Driver
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
@@ -27,17 +27,21 @@
 ;;	SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;
 
+
 %include "osz.inc"
 
-;;	MAX 4.5KB
-%define	_fat12_fat_buffer	(_END)
-;;	MAX 8KB
-%define	_fat12_dir_buffer	(_END+0x1200)
-%define	MAX_BUFFER			0x3200
-;;	MAX 256B
-%define	_dir_buff			(_END+0x3200)
 
-%define	SIZE_BSS			0x3300
+;;	MAX 4.5KB (2880)
+%define	_fat12_fat_buffer	(_END)
+
+;;	MAX 7KB (224)
+%define	_fat12_dir_buffer	(_END+0x1200)
+%define	MAX_BUFFER			0x2E00
+
+;;	MAX 256B
+%define	_dir_buff			(_END+MAX_BUFFER)
+
+%define	SIZE_BSS			0x2F00
 
 %define	MAX_FILENAME		64
 
@@ -50,16 +54,6 @@ _HEAD:
 _crt:
 	mov [_osz_systbl], bx
 	mov [_osz_systbl+2], es
-
-%if 0
-	mov ah, BIOS_INIT_DISK
-	call _call_bios
-	or ax, ax
-	jnz .install_ok
-	xor ax, ax
-	retf
-.install_ok:
-%endif
 
 	xor ax, ax
 	mov es, ax
@@ -173,26 +167,33 @@ _fat12_init:
 	mov ax, [_begin_root_dir]
 	mov [si+8], ax
 	mov [si+4], word _fat12_dir_buffer
-	xor ah, ah
-	mov al, [_n_sectors_root_dir]
-	mov [si+2], ax
+	mov [si+2], byte 1
+.loop_read_root:
 	mov ah, BIOS_READ_DISK
 	call _call_bios
 
-	;	scan number of entries of root dir
-_scan_root:
-	mov cx, 0xE0 ; number of entries of root dir
-	xor dx,dx
-	mov si, _fat12_dir_buffer
-.loop:
-	lodsb
-	or al,al
-	jz .end
-	inc dx
-	add si, byte 31
-	loop .loop
-.end:
-	mov [_n_root_entries], dx
+	mov cl, [_sector_shift]
+	mov bx, [si+4]
+	mov dx, 4
+	shl dx, cl
+	xor al, al
+.loop_scan_root:
+	cmp [bx], al
+	jz .end_scan_root
+	inc word [_n_root_entries]
+	add bx, byte 32
+	dec dx
+	jnz .loop_scan_root
+
+	dec di
+	jz .end_scan_root
+	inc word [si+8]
+	mov ax, 128
+	shl ax, cl
+	add [si+4], ax
+	jmp .loop_read_root
+
+.end_scan_root:
 
 _end_init:
 	pop di
@@ -480,9 +481,6 @@ _fat12_open:
 
 
 _fat12_close:
-	ret
-
-
 _fat12_nop:
 	xor ax, ax
 	ret

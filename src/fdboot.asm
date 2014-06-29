@@ -1,9 +1,6 @@
 ;;	-*- coding: utf-8 -*-
-;;
 ;;	Floppy Boot Sector for OSZ
-;;
 ;;	PUBLIC DOMAIN
-;;	First Written by 1998-2014 MEG-OS project
 ;;
 
 [bits 16]

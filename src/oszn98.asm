@@ -1,6 +1,6 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Z - BIOS for NEC PC-9800 Series Personal Computer
+;;	MEG OSZ - BIOS for NEC PC-9800 Series Personal Computer
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
@@ -346,6 +346,8 @@ _bios_init_disk:
 	cmp ch, 2
 	jz short .found_2HC
 
+	cmp ch, 3
+	jnz short .no_2HD
 	mov dx, 0x4C08
 	jmp short .continue
 
@@ -587,7 +589,3 @@ crt:
 
 	alignb 16
 _END:
-
-
-
-
