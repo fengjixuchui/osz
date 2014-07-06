@@ -91,6 +91,7 @@ _bios_table:
 	dw _bios_fd_write
 	dw _bios_beep
 	dw _bios_tick
+	dw _bios_fd_status
 
 
 __irq00:
@@ -436,6 +437,11 @@ _bios_fd_read:
 
 _bios_fd_write:
 	xor ax, ax
+	ret
+
+
+_bios_fd_status:
+	mov ax, 0x0001
 	ret
 
 

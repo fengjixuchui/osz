@@ -889,20 +889,22 @@ _loop:
 	int 0x3F
 
 	mov ax, dx
-	or ax, ax
+	or al, al ; null
 	jz short .bad_magic
-	cmp ax, 0xFFFF
+	cmp al, 0xFF ; 
 	jz short .bad_magic
-	cmp ax, 'ZM' ; DOS EXE FORMAT
+	cmp al, 0x7F ; elf, etc.
 	jz short .bad_magic
-	cmp ax, 'MZ' ; DOS EXE FORMAT
-	jz short .bad_magic
-	cmp ax, '#!' ; shebang
+	cmp al, '#' ; shebang
 	jz short .bad_magic
 	cmp al, 0xC9 ; INVALID
 	jz short .bad_magic
 	cmp al, 0xC3 ; SILENT
 	jz short .magic_silent
+	cmp ax, 'ZM' ; DOS EXE FORMAT
+	jz short .bad_magic
+	cmp ax, 'MZ' ; DOS EXE FORMAT
+	jz short .bad_magic
 
 	mov dx, ds
 	cli

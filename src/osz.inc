@@ -42,17 +42,18 @@
 
 
 ;;	BIOS
-%define	BIOS_CONST		0
-%define	BIOS_CONIN		1
-%define	BIOS_CONOUT		2
-%define	BIOS_CLS		3
-%define	BIOS_POWER		4
-%define	BIOS_DISPOSE	5
-%define	BIOS_INIT_DISK	6
-%define	BIOS_READ_DISK	7
-%define	BIOS_WRITE_DISK	8
-%define	BIOS_BEEP		9
+%define	BIOS_CONST		0x00
+%define	BIOS_CONIN		0x01
+%define	BIOS_CONOUT		0x02
+%define	BIOS_CLS		0x03
+%define	BIOS_POWER		0x04
+%define	BIOS_DISPOSE	0x05
+%define	BIOS_INIT_DISK	0x06
+%define	BIOS_READ_DISK	0x07
+%define	BIOS_WRITE_DISK	0x08
+%define	BIOS_BEEP		0x09
 %define	BIOS_GET_TICK	0x0A
+%define	BIOS_FD_STATUS	0x0B
 
 %define	BIOS_READ_MASS	99999
 %define	BIOS_WRITE_MASS	99999

@@ -55,6 +55,15 @@ _crt:
 	mov [_osz_systbl], bx
 	mov [_osz_systbl+2], es
 
+	mov ah, BIOS_FD_STATUS
+	call _call_bios
+	or al, al
+	jnz short .drive_found
+	xor ax, ax
+	retf
+
+.drive_found:
+
 	xor ax, ax
 	mov es, ax
 	mov bx, 0x3F*4

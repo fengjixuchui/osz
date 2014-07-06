@@ -75,6 +75,7 @@ _bios_table:
 	dw _bios_fd_write
 	dw _bios_beep
 	dw _bios_tick
+	dw _bios_fd_status
 
 
 __int1C:
@@ -303,6 +304,12 @@ _bios_fd_read:
 
 _bios_fd_write:
 	xor ax, ax
+	ret
+
+
+_bios_fd_status:
+	mov al, [cs:n_fds]
+	xor ah, ah
 	ret
 
 
