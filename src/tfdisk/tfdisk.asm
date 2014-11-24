@@ -54,6 +54,7 @@
 [org 0x0100]
 
 start:
+	xor bp, bp
 	mov ah, OSZ_DOS_SYSINFO
 	call bp
 	cmp ch, 0x01

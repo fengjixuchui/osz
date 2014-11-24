@@ -5,6 +5,9 @@
 
 [bits 16]
 [org 0x0100]
+
+	xor bp, bp
+
 	mov cx, 2000
 	call _beep
 	mov cx, 1000

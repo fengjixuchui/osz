@@ -31,9 +31,11 @@
 %include "osz.inc"
 
 
-%define	INT_DOS_VERSION		0x3205
+%define OSZ_BDOS	0x004A
 
-%define OSZ_BDOS	0x000A
+%define	FAKE_DOSVER	0x0005
+%define	PSP_PARENT	0x0016
+%define	PSP_SETVER	0x0040
 
 %define	MAX_CMDLINE	127
 %define	MAX_CMD		127
@@ -82,53 +84,21 @@ _HEAD:
 	alignb 4
 _saved_sssp	dd 0
 
-_BDOS_function_table:
-	dw _BDOS_00
-	dw _BDOS_01
-	dw _BDOS_02
-	dw _BDOS_03
-	dw _BDOS_04
-	dw _BDOS_05
-	dw _BDOS_06
-	dw _BDOS_07
-	dw _BDOS_08
-	dw _BDOS_09
-	dw _BDOS_0A
-	dw _BDOS_0B
-	dw _BDOS_0C
-	dw _BDOS_0D
-	dw _BDOS_0E
-	dw _BDOS_0F
-	dw _BDOS_10
-	dw _BDOS_11
-	dw _BDOS_12
-	dw _BDOS_13
-	dw _BDOS_14
-	dw _BDOS_15
-	dw _BDOS_16
-	dw _BDOS_17
-	dw _BDOS_18
-	dw _BDOS_19
-	dw _BDOS_1A
-	dw _BDOS_unknown-_HEAD
-_END_BDOS_function:
-
 int21_function_table:
-	dw _BDOS_00
-	dw int21_01
-	dw int21_02
-	dw int21_03
-	dw int21_04
-	dw int21_05
-	dw int21_06
-	dw int21_07
-	dw int21_08
-	dw int21_09
-	dw int21_0A
-	dw int21_0B
-	dw int21_0C
+	dw int21_00, int21_01, int21_02, int21_03, int21_04, int21_05, int21_06, int21_07, int21_08, int21_09, int21_0A, int21_0B, int21_0C, int21_0D, int21_0E, int21_0F,
+	dw int21_0F, int21_10, int21_11, int21_12, int21_13, int21_14, int21_15, int21_16, int21_17, int21_18, int21_19, int21_1A, int21_1B, int21_1C, int21_1D, int21_1E,
+	dw int21_1E, int21_1F, int21_20, int21_21, int21_22, int21_23, int21_24, int21_25, int21_26, int21_27, int21_28, int21_29, int21_2A, int21_2B, int21_2C, int21_2D,
+	dw int21_2D, int21_2E, int21_2F, int21_30, int21_31, int21_32, int21_33, int21_34, int21_35, int21_36, int21_37, int21_38, int21_39, int21_3A, int21_3B, int21_3C,
+	dw int21_3C, int21_3D, int21_3E, int21_3F, int21_40, int21_41, int21_42, int21_43, int21_44, int21_45, int21_46, int21_47, int21_48, int21_49, int21_4A, int21_4B,
+	dw int21_4B, int21_4C, int21_4D, int21_4E, int21_4F, int21_50, int21_51, int21_52, int21_53, int21_54, int21_55, int21_56, int21_57, int21_58, int21_59, int21_5A,
+	dw int21_5A, int21_5B, int21_5C, int21_5D, int21_5E, int21_5F, int21_60, int21_61, int21_62, int21_63, int21_64, int21_65, int21_66, int21_67, int21_68, int21_69,
 end_int21_function:
 
+_BDOS_function_table:
+	dw _BDOS_00, _BDOS_01, _BDOS_02, _BDOS_03, _BDOS_04, _BDOS_05, _BDOS_06, _BDOS_07
+	dw _BDOS_08, _BDOS_09, _BDOS_0A, _BDOS_0B, _BDOS_0C, _BDOS_0D, _BDOS_0E, _BDOS_0F
+	dw _BDOS_10, _BDOS_11, _BDOS_12, _BDOS_13, _BDOS_14, _BDOS_15, _BDOS_16, _BDOS_17
+_END_BDOS_function:
 
 _BDOS_over:
 	mov ax, 0xFFFF
@@ -167,12 +137,37 @@ _BDOS_return:
 
 
 _int21_over:
-	mov al, 0xFF
+	xor al, al
 	iret
 
 _int21:
 	cmp ah, (end_int21_function-int21_function_table)/2
 	jae short _int21_over
+	cmp ah, 0x62
+	ja short .out_of_5052
+	jz short .int21_5162
+	cmp ah, 0x52
+	ja short .out_of_5052
+	jnz short .no_52
+.int21_52: ; GET LOL (DUMMY)
+	xor bx, bx
+	mov es, bx
+	iret
+.no_52:
+	cmp ah, 0x50
+	jb short .out_of_5052
+	jnz short .int21_5162
+
+.int21_50: ; SET CURRENT PSP
+	mov [cs:_CURRENT_PSP], bx
+	iret
+
+.int21_5162: ; GET CURRENT PSP
+	mov bx,[cs:_CURRENT_PSP]
+	iret
+
+.out_of_5052:
+
 	push es
 	push ds
 	push bp
@@ -187,9 +182,16 @@ _int21:
 	mov bl, ah
 	xor bh, bh
 	add bx, bx
+	clc
+
 	call [cs:int21_function_table + bx]
 
-	lea sp,[bp+2]
+	mov [bp+STK_AX], ax
+	sbb al, al
+	and al, 0x01
+	mov [bp+STK_FLAGS], al
+
+	pop ax
 	pop cx
 	pop dx
 	pop bx
@@ -198,6 +200,10 @@ _int21:
 	pop bp
 	pop ds
 	pop es
+int21_50:
+int21_51:
+int21_52:
+int21_62:
 _int_nop:
 	iret
 
@@ -206,6 +212,8 @@ _int_nop:
 int21_03:
 int21_04:
 int21_05:
+int21_2E:	; SET VERIFY
+int21_54:	; GET VERIFY
 	xor al, al
 	ret
 
@@ -224,9 +232,6 @@ _BDOS_0C:
 _BDOS_0D:
 _BDOS_0E:
 _BDOS_0F:
-_BDOS_18:
-_BDOS_19:
-_BDOS_1A:
 	mov ax, 0xFFFF
 	ret
 
@@ -436,14 +441,14 @@ _BDOS_04:
 	; SYSINFO
 _BDOS_08:
 	les bx,[cs:_osz_systbl]
-	mov ax, [es:bx + OSZ_SYSTBL_VERSION]
+	mov ax, [es:bx + OSZ_SYSTBL_REVISION]
 	mov [bp+STK_BX], ax
 	mov cl, [es:bx + OSZ_SYSTBL_CPUID]
 	mov ch, [es:bx + OSZ_SYSTBL_ARCH]
 	mov [bp+STK_CX], cx
 	xor dx, dx
 	mov [bp+STK_DX], dx
-	mov ax, INT_DOS_VERSION
+	mov ax, [es:bx + OSZ_SYSTBL_VERSION]
 	ret
 
 
@@ -527,6 +532,112 @@ int21_0A:
 	ret
 
 
+	; SET IVT
+int21_25:
+	xor bx, bx
+	mov es, bx
+	mov bl, al
+	add bx, bx
+	add bx, bx
+	mov [es:bx], dx
+	mov [es:bx+2], ds
+	ret
+
+
+	; GET IVT
+int21_35:
+	xor bx, bx
+	mov es, bx
+	mov bl, al
+	add bx, bx
+	add bx, bx
+	les bx, [es:bx]
+	mov [bp+STK_BX], bx
+	mov [bp+STK_ES], es
+	ret
+
+
+	; GET FAKED DOS VER
+int21_30:
+	mov es, [cs:_CURRENT_PSP]
+	mov ax, [es:PSP_SETVER]
+	xor cx, cx
+	mov [bp+STK_BX], cx
+	mov [bp+STK_CX], cx
+	ret
+
+
+	; CREATE NEW PSP
+int21_26:
+	push es
+	push ds
+
+	mov es, dx
+
+	xor di, di
+	mov ax, 0x20CD ; INT 20
+	stosw
+	xor ax,ax ; TODO: MEMSZ
+	dec ax
+	stosw
+	
+	xor al,al
+	stosb
+	mov ax, 0xFFFF
+	stosb
+	stosw
+	stosw
+
+	xor ax, ax
+	mov ds, ax
+	mov si, 0x22*4
+	mov cx, 6
+	rep movsw
+
+	;xor ax, ax
+	mov cx, 0x007B
+	rep stosw
+	
+	mov di, OSZ_BDOS
+	mov al, 0x9A
+	stosb
+	mov ax, _psp_bdos
+	stosw
+	mov ax, cs
+	stosw
+	mov al, 0xC3
+	stosb
+	
+	mov di, PSP_SETVER
+	mov ax, FAKE_DOSVER
+	stosw
+
+	pop ds
+	pop es
+	ret
+
+
+	; FCB FUNCTIONS
+int21_0F:	; FCB OPEN
+int21_10:	; FCB CLOSE
+int21_11:	; FCB FIND FIRST
+int21_12:	; FCB FIND NEXT
+int21_13:	; FCB DELETE
+int21_14:	; FCB READ SEQUENTIAL
+int21_15:	; FCB WRITE SEQUENTIAL
+int21_16:	; FCB CREATE OR TRUNCATE
+int21_17:	; FCB RENAME
+int21_21:	; FCB READ RANDOM
+int21_22:	; FCB WRITE RANDOM
+int21_23:	; FCB GET FILE SIZE
+int21_24:	; FCB SET RANDOM RECORD
+int21_27:	; FCB RANDOM BLOCK READ
+int21_28:	; FCB RANDOM BLOCK WRITE
+	mov al, 0xFF
+	ret
+
+
+
 
 	; TODO: IFS
 _BDOS_IFS:
@@ -545,6 +656,99 @@ _BDOS_17:
 	sub al, OSZ_DOS_IFS
 	mov ah, OSZ_I3F_IFS
 	int 0x3F
+	ret
+
+
+int21_39:	; mkdir
+int21_3A:	; rmdir
+int21_41:	; unlink
+
+int21_3B:	; set cwd
+
+int21_3E:	; CloseHandle
+int21_3F:	; ReadFile
+int21_40:	; WriteFile
+int21_42:	; seek
+int21_43:	; get/set file attrs
+int21_44:	; ioctl
+int21_45:	; dup
+int21_46:	; dup2
+int21_47:	; get cwd
+int21_60:	; truename
+	mov al, 0x05
+	stc
+	ret
+
+
+int21_6C:	; CreateFileEx
+int21_3C:	; creat
+int21_3D:	; open
+int21_5A:	; create temp file
+int21_5B:	; create new file
+	mov al, 0x02
+	stc
+	ret
+
+
+
+	; TODO: DOS
+int21_0D:
+int21_0E:
+int21_18:	; NULL FOR CP/M
+int21_19:	; GET CURRENT DRIVE
+int21_1A:	; GET DTA
+int21_1B:
+int21_1C:
+int21_1D:	; NULL FOR CP/M
+int21_1E:	; NULL FOR CP/M
+int21_1F:
+int21_20:	; NULL FOR CP/M
+int21_29:	; PARSE FCB FILENAME
+int21_2A:	; GET SYSTEM DATE
+int21_2B:	; SET SYSTEM DATE
+int21_2C:	; GET SYETEM TIME
+int21_2D:	; SET SYSTEM TIME
+int21_2F:
+int21_31:
+int21_32:
+int21_33:
+int21_34:
+int21_36:
+int21_37:
+int21_38:
+int21_48:	; malloc
+int21_49:	; free
+int21_4A:	; realloc
+int21_4B:
+int21_4D:
+int21_4E:
+int21_4F:
+int21_53:
+int21_55:
+int21_56:
+int21_57:
+int21_58:
+int21_59:
+
+int21_5C:
+int21_5D:
+int21_5E:
+int21_5F:
+int21_61:
+int21_63:
+int21_64:
+int21_65:
+int21_66:
+int21_67:
+int21_68:	; commit file
+int21_69:
+int21_6A:	; commit file
+int21_6B:
+int21_6D:
+int21_6E:
+int21_6F:
+	mov ax, 0xFFFF
+	stc
 	ret
 
 
@@ -575,7 +779,7 @@ _crt:
 	stosw
 	mov ax, cs
 	stosw
-	add di, byte 4 ; INT 2 - NMI
+	mov di, 0x03*4
 	mov ax, _int03
 	stosw
 	mov ax, cs
@@ -622,6 +826,18 @@ _crt:
 	xor ax, ax
 	rep stosw
 
+	les bx, [cs:_osz_systbl]
+	mov dx, [es:bx+OSZ_SYSTBL_LASTMEM]
+	mov [_ROOT_PSP], dx
+	mov [_CURRENT_PSP], dx
+	mov ax, dx
+	add ax, 0x0011
+	mov [es:bx+OSZ_SYSTBL_LASTMEM], ax
+	call int21_26
+
+	push cs
+	pop es
+
 	mov [_saved_sssp], sp
 	mov [_saved_sssp+2], ss
 
@@ -629,8 +845,27 @@ _crt:
 	sub sp, SIZE_MAINSTACK
 
 	call _cmd_ver
+
+	mov cx, 2000
+	call _beep
+	mov cx, 1000
+	call _beep
+
 	call _cmd_mem
 	jmp short _loop
+
+_beep:
+	mov ah, BIOS_BEEP
+	call _call_bios
+
+	mov ah, OSZ_DOS_WAIT_TICK
+	mov cx, 200
+	call _BDOS_0B
+
+	xor cx, cx
+	mov ah, BIOS_BEEP
+	call _call_bios
+	ret
 
 _int27: ; DOS1+ TERMINATE AND STAY RESIDENT
 	or dx, dx
@@ -666,17 +901,25 @@ _abort_w_msg:
 	call _BDOS_entry
 	;jmp short _BDOS_00
 
+int21_00: ; exit
+int21_4C: ; DOS2+ exit with return code
 _BDOS_00: ; EXIT
+	cli
+	cld
+
+	mov ds, [cs:_CURRENT_PSP]
+	mov dx, [ds:PSP_PARENT]
+	mov [cs:_CURRENT_PSP], dx
+
 	mov cx, cs
 	mov ds, cx
 	mov es, cx
-	cli
-	cld
 	mov ss,[_saved_sssp+2]
 	mov sp,[_saved_sssp]
 	mov bp, sp
 	sub sp, SIZE_MAINSTACK
 	call _crlf
+
 	;jmp short _loop
 
 _loop:
@@ -803,58 +1046,14 @@ _loop:
 	mov ax, [es:bx+OSZ_SYSTBL_MEMSZ]
 	mov [bp+LOCAL_MEMSZ], ax
 
-	mov es, [es:bx+OSZ_SYSTBL_LASTMEM]
-%if 0
-	xor di, di
-	mov ax, '_='
-	stosw
+	mov dx, [es:bx+OSZ_SYSTBL_LASTMEM]
+	call int21_26
 
-	mov si, cmdline
-	mov cx, [bp+LOCAL_SIZE_CMDLINE]
-	rep movsb
-	xor ax, ax
-	stosw
+	mov ax, [cs:_CURRENT_PSP]
+	mov es, dx
+	mov [cs:_CURRENT_PSP], dx
+	mov [es:PSP_PARENT], ax
 
-	mov cl, 4
-	add di, byte 0x0F
-	shr di, cl
-	inc di
-	mov bx, es
-	add di, bx
-	mov es, di
-%endif
-	
-	; create psp
-	xor di, di
-	xor ax, ax
-	mov cx, 0x8000
-	rep stosw
-	
-	;mov [es:0x2C], bx
-
-	;xor di, di
-	mov ax, 0x20CD ; INT 20
-	stosw
-	mov ax, [bp+LOCAL_MEMSZ]
-	dec ax
-	stosw
-	
-	xor al,al
-	stosb
-	mov ax, 0xFFFF
-	stosb
-	stosw
-	stosw
-	
-	mov al, 0x9A
-	stosb
-	mov ax, _psp_bdos
-	stosw
-	mov ax, cs
-	stosw
-	mov al, 0xC3
-	stosw
-	
 	mov di, 0x0080
 	mov si, arg_buffer
 	mov ax, [bp+LOCAL_SIZE_ARG]
@@ -889,23 +1088,12 @@ _loop:
 	int 0x3F
 
 	mov ax, dx
-	or al, al ; null
-	jz short .bad_magic
-	cmp al, 0xFF ; 
-	jz short .bad_magic
-	cmp al, 0x7F ; elf, etc.
-	jz short .bad_magic
-	cmp al, '#' ; shebang
-	jz short .bad_magic
-	cmp al, 0xC9 ; INVALID
-	jz short .bad_magic
-	cmp al, 0xC3 ; SILENT
-	jz short .magic_silent
-	cmp ax, 'ZM' ; DOS EXE FORMAT
-	jz short .bad_magic
-	cmp ax, 'MZ' ; DOS EXE FORMAT
-	jz short .bad_magic
+	cmp ax, 0xED31 ; XOR BP, BP - format1
+	jz short .magic_ok
+	cmp ax, 0xED33 ; XOR BP, BP - format2
+	jnz short .bad_magic
 
+.magic_ok:
 	mov dx, ds
 	cli
 	mov ss, dx
@@ -917,6 +1105,8 @@ _loop:
 	xor bx, bx
 	push ax
 	push ds
+	inc si
+	inc si
 	push si
 	push ds
 	pop es
@@ -933,9 +1123,6 @@ _loop:
 	mov dx, bad_magic_found_msg
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
-	;jmp _BDOS_00
-
-.magic_silent:
 	jmp _BDOS_00
 
 
@@ -948,16 +1135,34 @@ _cmd_exit:
 
 
 _cmd_ver:
+	push es
+
 	mov dx, ver_msg
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
-	ret
 
+	les bx,[cs:_osz_systbl]
+	mov si, [es:bx + OSZ_SYSTBL_REVISION]
+	mov bx, [es:bx + OSZ_SYSTBL_VERSION]
 
-_cmd_uname:
-	mov dx, uname_msg
-	mov ah, OSZ_DOS_PUTS
-	call _BDOS_entry
+	mov dl, bl
+	xor dh, dh
+	call _disp_dec
+	mov al, '.'
+	int 0x29
+
+	mov dl, bh
+	xor dh, dh
+	call _disp_dec
+	mov al, '.'
+	int 0x29
+
+	mov dx, si
+	call _disp_dec
+	mov al, 10
+	int 0x29
+
+	pop es
 	ret
 
 
@@ -1322,13 +1527,11 @@ cmd_table:
 	dw _cmd_exit
 	db 4, "type"
 	dw _cmd_type
-	db 5, "uname"
-	dw _cmd_uname
 	db 0
 
 
 ver_msg:
-	db "MEG OSZ ver 0.0.4", 10, 0
+	db "MEG OSZ ver ", 0
 
 bad_cmd_msg:
 	db "Bad command or file name", 10, 0
@@ -1347,11 +1550,13 @@ mem_2_msg		db "/", 0
 mem_prot_msg	db "Extend: ", 0
 mem_kb_msg		db " KB", 10, 0
 
-int00_msg	db 10, "#DIV ERROR", 10, 0
+int00_msg	db 10, "#DIV/0!", 10, 0
 int01_msg	db 10, "#DEBUG", 10, 0
 int03_msg	db 10, "#BREAKPOINT", 10, 0
 int04_msg	db 10, "#OVERFLOW", 10, 0
 
+_ROOT_PSP		dw 0
+_CURRENT_PSP	dw 0
 
 	alignb 16
 _BSS:

@@ -29,7 +29,9 @@
 
 %include "osz.inc"
 
-%define	VER_INTEGER		0x0004
+; 0x0201 = 1.2
+%define	VER_MAJ_MIN		0x0000
+%define	VER_REVISION	0x0005
 %define	IPL_SIGN		0x1eaf
 
 %define	ORG_BASE		0x0800
@@ -116,7 +118,8 @@ _crt:
 	pop ax
 	mov [bp+OSZ_SYSTBL_ARCH], ax
 	mov [bp+OSZ_SYSTBL_CALLBIOS], byte 0xEA
-	mov [bp+OSZ_SYSTBL_VERSION], word VER_INTEGER
+	mov [bp+OSZ_SYSTBL_VERSION], word VER_MAJ_MIN
+	mov [bp+OSZ_SYSTBL_REVISION], word VER_REVISION
 	
 	mov [es:0x00FC], word _int3F
 	mov [es:0x00FE], es
@@ -181,10 +184,6 @@ _DETECT_CPUID:
 	jbe .env_no_cpuid80000000
 	mov eax,0x80000001
 	cpuid
-	;bt edx,20
-	;jnc short .env_no_nx
-	;or byte [ebp],ENV_NX
-;.env_no_nx:
 	bt edx,29
 	jnc short .env_no_amd64
 	mov byte [es:di], 6

@@ -32,6 +32,7 @@
 [org 0x0100]
 
 _main:
+	xor bp, bp
 	mov ah, OSZ_DOS_SYSINFO
 	call bp
 	mov [_cpuid_family_id], cl

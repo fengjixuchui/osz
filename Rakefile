@@ -85,7 +85,6 @@ end
 
 def make_disk(output, ipl, files)
   file output => [ PATH_CATARC, ipl, files].flatten do |t|
-    #sh "#{ PATH_CATARC } --force-lfn --no-ntreserved --bs #{ ipl } #{ t.name } '#{ files.join("' '") }'"
     sh "#{ PATH_CATARC } --bs #{ ipl } #{ t.name } '#{ files.join("' '") }'"
   end
 end
@@ -95,12 +94,14 @@ end
 # OSZ
 namespace :osz do
 
+  PATH_OSZ_INC = "#{ PATH_SRC}osz.inc"
+
   # normal apps
   APPS = %w(hello chars chars2 echo2 cpuid pipo test).collect do |t|
     bin = "#{ PATH_OUTPUT }#{ t }#{ APP_EXT }"
     src = "#{ PATH_SRC }#{ t }.asm"
-    file bin => src do |t|
-      sh "#{ AS } #{ AFLAGS } -o #{t.name} #{t.prerequisites.join(' ')}"
+    file bin => [src, PATH_OSZ_INC] do |t|
+      sh "#{ AS } #{ AFLAGS } -o #{t.name} #{ src }"
     end
     bin
   end
@@ -128,7 +129,7 @@ namespace :osz do
     end
   end
 
-  file PATH_TFDISK_BIN => [PATH_TFDISK_SRC, PATH_TFMBR_BIN, PATH_EXIPL_BIN, PATH_IPL16_BIN, PATH_IPL32_BIN] do |t|
+  file PATH_TFDISK_BIN => [PATH_TFDISK_SRC, PATH_TFMBR_BIN, PATH_EXIPL_BIN, PATH_IPL16_BIN, PATH_IPL32_BIN, PATH_OSZ_INC] do |t|
     sh ["#{ AS } #{ AFLAGS } -i #{ PATH_SRC} -o #{t.name}",
       "-DPATH_MBR=\\\"#{File.expand_path(PATH_TFMBR_BIN)}\\\"",
       "-DPATH_EXIPL=\\\"#{File.expand_path(PATH_EXIPL_BIN)}\\\"",
@@ -141,8 +142,8 @@ namespace :osz do
   OSZ_MODS = %w(osz2boot oszbio oszn98 fat12 oszre oszdos).collect do |t|
     bin = "#{ PATH_OUTPUT }mod_#{ t }.bin"
     src = "#{ PATH_SRC }#{ t }.asm"
-    file bin => src do |t|
-      sh "#{ AS } #{ AFLAGS } -o #{t.name} #{t.prerequisites.join(' ')}"
+    file bin => [src, PATH_OSZ_INC] do |t|
+      sh "#{ AS } #{ AFLAGS } -o #{t.name} #{ src }"
     end
     bin
   end
@@ -164,6 +165,3 @@ namespace :osz do
   make_disk(PATH_BOOT_FLP, PATH_FDBOOT_IPL, ROOT_FILES)
 
 end
-
-
-
