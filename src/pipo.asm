@@ -1,5 +1,5 @@
 ; Pipo - Splash Sound of Japanese Personal Computer for OSZ
-; PUBLIC DOMAIN
+; WTFPL/PUBLIC DOMAIN
 
 %include "osz.inc"
 

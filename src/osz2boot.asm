@@ -1,10 +1,10 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG OSZ - Second boot loader
+;;	MEG OSZ - lcoore (Second boot loader)
 ;;
-;;	Copyright (c) 1998-2014, MEG-OS project
+;;	Copyright (c) 2014,2015 MEG-OS project
 ;;	All rights reserved.
-;;	
+;;
 ;;	Redistribution and use in source and binary forms, with or without modification, 
 ;;	are permitted provided that the following conditions are met:
 ;;	
@@ -31,7 +31,7 @@
 
 ; 0x0201 = 1.2
 %define	VER_MAJ_MIN		0x0000
-%define	VER_REVISION	0x0005
+%define	VER_REVISION	0x0006
 %define	IPL_SIGN		0x1eaf
 
 %define	ORG_BASE		0x0800
@@ -42,6 +42,14 @@
 [org ORG_BASE]
 
 _HEAD:
+	db "EM"
+	jmp short _legacy_entry
+	db 0
+n_files		db 0
+file_size	dw 0
+offset_data	dw 0
+
+_legacy_entry:
 	xor ax, IPL_SIGN
 	jz short _crt
 forever:
@@ -55,19 +63,16 @@ _int3F:
 _next:
 
 .load_loop:
+	push bx
+	push ds
 	push es
-	xor si, si
-	xor di, di
-	
-	mov cx, [si+0x02]
-	mov dx, ds
-	add dx, cx
-	push dx
-	add cx, cx
-	add cx, cx
-	add cx, cx
-	rep movsw
 
+	mov cx, [bx]
+	jcxz forever
+	xor di, di
+	rep movsb
+
+	push si
 	push es
 	push cs
 	pop es
@@ -76,11 +81,14 @@ _next:
 
 	push cs
 	call _invoke
-	
+
+	pop si
+	pop dx
 	pop ds
 	pop bx
-	add bx, ax
-	mov es, bx
+	add dx, ax
+	mov es, dx
+	add bx, byte 8
 	jmp short .load_loop
 
 _invoke:
@@ -111,16 +119,26 @@ _crt:
 	mov cx,  (_END - _HEAD)/2
 	rep movsw
 	mov di, _osz_systbl
-	mov cx, OSZ_SYSTBL_SIZE/2
-	rep stosw
+	mov bp, di
 
-	mov bp, _osz_systbl
+	mov al, 0xEA
+	stosb
+	xor ax, ax
+	stosb
+	stosw
+	stosw
+
 	pop ax
-	mov [bp+OSZ_SYSTBL_ARCH], ax
-	mov [bp+OSZ_SYSTBL_CALLBIOS], byte 0xEA
-	mov [bp+OSZ_SYSTBL_VERSION], word VER_MAJ_MIN
-	mov [bp+OSZ_SYSTBL_REVISION], word VER_REVISION
-	
+	stosw
+	mov ax, VER_MAJ_MIN
+	stosw
+	mov ax, VER_REVISION
+	stosw
+
+	xor ax, ax
+	mov cx, 3
+	stosw
+
 	mov [es:0x00FC], word _int3F
 	mov [es:0x00FE], es
 	
@@ -193,16 +211,15 @@ _DETECT_CPUID:
 
 .end_cpu:
 
-	mov ax, ds
-	add ax, (_END-_HEAD)/16
-	mov ds, ax
 	mov dx, (ORG_BASE + _END_RESIDENT - _HEAD)/16
 	mov es, dx
 
+	mov cl, [n_files-ORG_BASE]
+	mov bx, _END-ORG_BASE
+	mov si, [offset_data-ORG_BASE]
+
 	retf
 
-
-	alignb 16
 _END:
 
 

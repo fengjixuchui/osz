@@ -1,54 +1,17 @@
 ;;	-*- coding: utf-8 -*-
-;;	Regular Floppy Boot Sector for OSZ
+;;	OSZ FAST BOOT SECTOR for Floppy
 ;;	WTFPL/PUBLIC DOMAIN
-;;
+
+%define	IPL_SIGN	0x1eaf
 
 [bits 16]
 
 _HEAD:
 	jmp short main
 	nop
-	db "IPL4OSZ "
-	; TODO: swith bpb
-%if 1
-	; 2HD 1440KB
-	dw 0x0200
-	db 1
-	dw 1
-	db 2
-	dw 0x00E0
-	dw 2880
-	db 0xF0
-	dw 9
-	dw 18
-	dw 2
-%else
-%if 1
-	; 2DD 720KB
-	dw 0x0200
-	db 2
-	dw 1
-	db 2
-	dw 0x0070
-	dw 0x05A0
-	db 0xF9
-	dw 3
-	dw 9
-	dw 2
-%else
-	; 2HD 1232KB
-	dw 0x0400
-	db 1
-	dw 1
-	db 2
-	dw 0x00C0
-	dw 1232
-	db 0xFE
-	dw 2
-	dw 8
-	dw 2
-%endif
-%endif
+	db "IPL4OSZF"
+
+incbin PATH_BPB
 
 ;;  Variables
 fat2    dw 0	; 2
@@ -129,7 +92,7 @@ init2:
 _next:
 	mov ax, 0x1000
 	mov es, ax
-	push es
+	;push es
 
 	mov al, [0x000D]
 	xor dx, dx
@@ -141,11 +104,10 @@ _next:
 .end:
 	mov [_clust_sft], dl
 
-	;; read Root DIR
+	;; FAT2
 	mov ax, [0x0011]
 	mov cl, 5
 	shl ax, cl
-	mov cx, ax
 	mov si, [0x0016]
 	add si, si
 	inc si
@@ -153,83 +115,55 @@ _next:
 	div word [0x000B]
 	add ax, si
 	mov [fat2], ax
-	xor bp, bp
-	call diskread
 
-	;; Read FAT
-	mov ax, [0x0016]
-	mul word [0x000B]
-	xchg ax, cx
-	mov si, 1
-	push cs
-	pop es
-	mov bp, 0x0400
-	call diskread
-	pop es
+	mov ax, 0x0E2E
+	int 0x10
 
-	;; Find System
-	mov cx, [0x0011]
-	xor di, di
-cfnl:
-	push cx
-	mov si, sysname
-	mov cx, 11
-	rep cmpsb
-	pop cx
-	jz ff
-	or di, byte 0x1F
-	inc di
-	loop cfnl
-	jmp forever
-ff:
-	and di, byte 0xE0
-	mov bx, [0x000B]
-	mov si, [es:di+0x001A]
-	xor bp, bp
+	;; READ FIRST CLUSTER
 	push es
+	xor bp, bp
 	push bp
-lfl:
-	cmp si, 0x0FF7
-	jae force
-	push si
-	mov cl, [_clust_sft]
-	dec si
-	dec si
-	shl si, cl
-	add si, [fat2]
-	mov dx, [0x000B]
-	shl dx, cl
-	mov cx, dx
+	mov si, [fat2]
+	mov cx, [0x000B]
 	call diskread
-noread:
-	pop ax
-	mov bx, ax
-	add bx, bx
-	add bx, ax
-	shr bx, 1
-	mov si, [cs:bx+0x0400]
-	jnc nfl0
-	mov cl, 4
-	shr si, cl
-nfl0:
-	and si, 0x0FFF
-	jmp short lfl
-force:
 
-	;; jump system
-	mov ax, 0x1eaf	; IPL signature
+	cmp word [es:0x0000], "EM"
+	jz sys_ok
+	jmp forever
+
+sys_ok:
+	mov ax, 0x0E2E
+	int 0x10
+
+	mov cx, [es:0x0006]
+	sub cx, [0x000B]
+	call diskread
+
+	mov ax, 0x0E2E
+	int 0x10
+
+	mov ax, IPL_SIGN
 	mov cx, [_arch]
 _retf:
 	retf
 
 
+
+
 	;; disk read
+	;;	IN cx:size si:LBA es:bp:buffer
+	;;	USES ax cx bx dx
 diskread:
 	xchg ax, cx
 	xor dx, dx
-	div word [0x000B]
+	mov bx, [0x000B]
+	dec bx
+	add ax, bx
+	adc dx, byte 0
+	inc bx
+	div bx
 	xchg ax, cx
-drl:
+drloop:
 	push cx
 
 	xor dx, dx
@@ -238,7 +172,6 @@ drl:
 	inc dx
 	shr ax, 1
 	adc dh, 0
-	mov bx, [0x000B]
 	cmp byte [_arch], 0
 	jz short dr98
 	cmp byte [_arch], 2
@@ -261,14 +194,10 @@ drmde:
 	jnc nohalt
 	jmp forever
 nohalt:
-	mov cl, 4
-	shr bx, cl
-	mov ax, es
-	add ax, bx
-	mov es, ax
+	add bp, bx
 	inc si
 	pop cx
-	loop drl
+	loop drloop
 	ret
 
 drFMT:
@@ -293,11 +222,6 @@ drFMT:
 forever:
 	jmp short $
 
-
-
-
-        ;;  FILENAMEEXT
-sysname db "KERNEL  SYS"
 
 	times 0x01FE - ($-$$) db 0
 	db 0x55, 0xAA

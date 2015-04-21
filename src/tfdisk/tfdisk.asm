@@ -2,7 +2,7 @@
 ;;
 ;;	TinyFDISK for OSZ
 ;;
-;;	Copyright (c) 1998-2014, MEG-OS project
+;;	Copyright (c) 1998-2015, MEG-OS project
 ;;	All rights reserved.
 ;;	
 ;;	Redistribution and use in source and binary forms, with or without modification,
@@ -55,21 +55,108 @@
 
 start:
 	xor bp, bp
+
+	or bp, bp
+	jnz .no_ipl
+	xor ax, 0x1eaf
+	jnz .no_ipl
+	cmp cl, 0x01
+	jz _boot_from_ipl
+	jmp $
+
+.no_ipl:
 	mov ah, OSZ_DOS_SYSINFO
 	call bp
 	cmp ch, 0x01
 	jnz .boot_ng
 	cmp cl, 0x03
-	jae .boot_ok
+	jae _boot_ok
 .boot_ng:
 	mov dx, bad_pc_msg
 	mov ah, OSZ_DOS_PUTS
 	call bp
 	ret
-.boot_ok:
+
+_boot_from_ipl:
+	cld
+	mov es, ax
+
+	mov ax, cs
+	sub ax, 0x0010
+	mov ss, ax
+	xor sp, sp
+
+	mov di, 0x20 * 4
+	mov ax, _int20
+	stosw
+	mov ax, ss
+	stosw
+
+	mov di, 0x29 * 4
+	mov ax, _int29
+	stosw
+	mov ax, ss
+	stosw
+
+	;mov ax, ss
+	mov ds, ax
+	mov es, ax
+	push ax
+	mov ax, _boot_ok
+	push ax
+	retf
 
 
-	mov [_current_drive],byte 0x80
+_int20:
+	mov ax, 0x5301
+	xor bx, bx
+	int 0x15
+	
+	mov ax, 0x530E
+	xor bx, bx
+	mov cx, 0x0102
+	int 0x15
+	
+	mov ax, 0x5307
+	mov bx, 0x0001
+	mov cx, 0x0003
+	int 0x15
+	
+	; then reboot
+	;mov al, 0xFF
+	;out 0x21, al
+	;out 0xA1, al
+	cli
+	mov al, 0xFE
+	out 0x64 ,al
+	mov al, 0x01
+	out 0x92, al
+	
+	int 0x19
+_forever:
+	hlt
+	jmp _forever
+
+
+_int29:
+	push ax
+	push bx
+	mov ah, 0x0E
+	cmp al, 10
+	jz .lf
+	mov bx, 0x0007
+	jmp .end
+.lf
+	int 0x10
+	mov al, 13
+.end:
+	int 0x10
+	pop bx
+	pop ax
+	iret
+
+_boot_ok:
+	mov [_current_drive], byte 0x80
 
 
 	;;	Read MBR
@@ -921,8 +1008,8 @@ scale_table:
 crlf				db 10
 null_string			db 0
 bad_pc_msg			db "This version of TFDISK cannot be run on this computer", 10, 0
-_banner				db " + TinyFDISK for OSZ + WARNING: THIS IS ALPHA VERSION. VERY DANGEROUS!",10
-					db 10,"Drive:",0
+_banner				db " + TinyFDISK for OSZ +",10
+					db 10,"DRIVE:",0
 mbr_badmbr_msg		db " BADMBR",0
 mbr_msg             db " MBR",0
 gpt_msg             db " GPT ",0
@@ -930,7 +1017,7 @@ _prompt_main		db 10,"[0-",MAX_DRIVE_NUM,":drive A:active N:nonactive F:fix mbr I
 _prompt_part_msg	db 10,"Partition?(0-3)",0
 _wait_msg			db 10,"  PRESS ANY KEY...",0
 _prompt_yn			db 10,"ARE YOU SURE?(Y/N)",0
-_write_ok			db 10,"Ok",0
+_write_ok			db 10,"OK",0
 disk_error_msg		db 10,"DISK I/O ERROR",0
 fs_not_support_msg	db 10,"NOT SUPPORTED FILESYSTEM",0
 invalid_fat32_msg	db 10,"INCOMPATIBLE FAT32 BPB",0

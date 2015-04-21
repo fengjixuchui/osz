@@ -2,7 +2,7 @@
 ;;
 ;;	MEG OSZ - BIOS for IBM PC
 ;;
-;;	Copyright (c) 1998-2014, MEG-OS project
+;;	Copyright (c) 2014,2015 MEG-OS project
 ;;	All rights reserved.
 ;;	
 ;;	Redistribution and use in source and binary forms, with or without modification, 
@@ -336,7 +336,7 @@ _bios_beep:
 	jmp short .end
 .stop:
 	in al,PORT_BEEP_FIRE
-	and al, 0x0D
+	and al, 0x0C
 	out PORT_BEEP_FIRE,al
 .end:
 	popf
@@ -443,6 +443,8 @@ crt:
 .no_lba:
 
 	; misc
+	;mov ax, 0x0012
+	;int 0x10
 	mov al, 13
 	int 0x29
 	

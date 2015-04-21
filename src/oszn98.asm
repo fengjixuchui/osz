@@ -2,7 +2,7 @@
 ;;
 ;;	MEG OSZ - BIOS for NEC PC-9800 Series Personal Computer
 ;;
-;;	Copyright (c) 1998-2014, MEG-OS project
+;;	Copyright (c) 2014,2015 MEG-OS project
 ;;	All rights reserved.
 ;;	
 ;;	Redistribution and use in source and binary forms, with or without modification, 

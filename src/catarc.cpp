@@ -644,13 +644,13 @@ int main(int argc, char* argv[]) {
 		{
 			char* p;
 
-			if(p=strchr(argv_copy,'=')){ // RENAME
+			if((p=strchr(argv_copy,'='))){ // RENAME
 				infile=p+1;
 				int filename_len=p-argv_copy;
 				if(filename_len>MAX_FILENAME) filename_len=MAX_FILENAME;
 				strncpy(fs.filename,argv_copy,filename_len);
 				printf(" + %s (%s)\n",fs.filename,infile);
-			}else if(p=strrchr(argv_copy,'/')){ // PATHed FILE
+			}else if((p=strrchr(argv_copy,'/'))){ // PATHed FILE
 				strncpy(fs.filename,p+1,MAX_FILENAME);
 				printf(" + %s (%s)\n",fs.filename,argv_copy);
 			}else{ // NO PATH FILE
@@ -798,7 +798,7 @@ int main(int argc, char* argv[]) {
 			dir[ch.files].index=2+fs.offset/padding_size;
 		}
 		indexes[ch.files] = fs;
-		while(read_size=fread(buff,1,SIZE_BUFFER,finfile)){
+		while((read_size=fread(buff,1,SIZE_BUFFER,finfile))){
 			fwrite(buff,1,read_size,fdat);
 		}
 		fclose(finfile);
@@ -942,7 +942,7 @@ int main(int argc, char* argv[]) {
 		write_zero(fimg,ch.base-get_file_size(fimg));
 	}
 	fseek(fdat,0,SEEK_SET);
-	while(read_size=fread(buff,1,SIZE_BUFFER,fdat)){
+	while((read_size=fread(buff,1,SIZE_BUFFER,fdat))){
 		fwrite(buff,1,read_size,fimg);
 	}
 	if(opt_rsize){
@@ -1010,13 +1010,13 @@ int main(int argc, char* argv[]) {
 				}
 			}
 			if(q){
-				printf("stub: Multiboot signature found: at %08x\n",(intptr_t)q-(intptr_t)stub);
+				printf("stub: Multiboot signature found: at %08x\n",(int32_t)((intptr_t)q-(intptr_t)stub));
 				q[5]=q[6]=q[4]+size_stub+get_file_size(finfile);
 			}
 		}
 		fwrite(stub,1,size_stub,fimg);
 
-		while(read_size=fread(buff,1,SIZE_BUFFER,finfile)){
+		while((read_size=fread(buff,1,SIZE_BUFFER,finfile))){
 			fwrite(buff,1,read_size,fimg);
 		}
 		fclose(finfile);

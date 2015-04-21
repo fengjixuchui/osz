@@ -2,7 +2,7 @@
 ;;
 ;;	MEG OSZ - BDOS Interface
 ;;
-;;	Copyright (c) 1998-2014, MEG-OS project
+;;	Copyright (c) 2014,2015 MEG-OS project
 ;;	All rights reserved.
 ;;	
 ;;	Redistribution and use in source and binary forms, with or without modification, 
@@ -85,19 +85,28 @@ _HEAD:
 _saved_sssp	dd 0
 
 int21_function_table:
-	dw int21_00, int21_01, int21_02, int21_03, int21_04, int21_05, int21_06, int21_07, int21_08, int21_09, int21_0A, int21_0B, int21_0C, int21_0D, int21_0E, int21_0F,
-	dw int21_0F, int21_10, int21_11, int21_12, int21_13, int21_14, int21_15, int21_16, int21_17, int21_18, int21_19, int21_1A, int21_1B, int21_1C, int21_1D, int21_1E,
-	dw int21_1E, int21_1F, int21_20, int21_21, int21_22, int21_23, int21_24, int21_25, int21_26, int21_27, int21_28, int21_29, int21_2A, int21_2B, int21_2C, int21_2D,
-	dw int21_2D, int21_2E, int21_2F, int21_30, int21_31, int21_32, int21_33, int21_34, int21_35, int21_36, int21_37, int21_38, int21_39, int21_3A, int21_3B, int21_3C,
-	dw int21_3C, int21_3D, int21_3E, int21_3F, int21_40, int21_41, int21_42, int21_43, int21_44, int21_45, int21_46, int21_47, int21_48, int21_49, int21_4A, int21_4B,
-	dw int21_4B, int21_4C, int21_4D, int21_4E, int21_4F, int21_50, int21_51, int21_52, int21_53, int21_54, int21_55, int21_56, int21_57, int21_58, int21_59, int21_5A,
-	dw int21_5A, int21_5B, int21_5C, int21_5D, int21_5E, int21_5F, int21_60, int21_61, int21_62, int21_63, int21_64, int21_65, int21_66, int21_67, int21_68, int21_69,
+	dw int21_00, int21_01, int21_02, int21_03, int21_04, int21_05, int21_06,
+	dw int21_07, int21_08, int21_09, int21_0A, int21_0B, int21_0C, int21_0D,
+	dw int21_0E, int21_0F, int21_10, int21_11, int21_12, int21_13, int21_14,
+	dw int21_15, int21_16, int21_17, int21_18, int21_19, int21_1A, int21_1B,
+	dw int21_1C, int21_1D, int21_1E, int21_1F, int21_20, int21_21, int21_22,
+	dw int21_23, int21_24, int21_25, int21_26, int21_27, int21_28, int21_29,
+	dw int21_2A, int21_2B, int21_2C, int21_2D, int21_2E, int21_2F, int21_30,
+	dw int21_31, int21_32, int21_33, int21_34, int21_35, int21_36, int21_37,
+	dw int21_38, int21_39, int21_3A, int21_3B, int21_3C, int21_3D, int21_3E,
+	dw int21_3F, int21_40, int21_41, int21_42, int21_43, int21_44, int21_45,
+	dw int21_46, int21_47, int21_48, int21_49, int21_4A, int21_4B, int21_4C,
+	dw int21_4D, int21_4E, int21_4F, int21_50, int21_51, int21_52, int21_53,
+	dw int21_54, int21_55, int21_56, int21_57, int21_58, int21_59, int21_5A,
+	dw int21_5B, int21_5C, int21_5D, int21_5E, int21_5F, int21_60, int21_61,
+	dw int21_62, int21_63, int21_64, int21_65, int21_66, int21_67, int21_68,
+	dw int21_69, int21_6A, int21_6B, int21_6C, int21_6D, int21_6E, int21_6F,
 end_int21_function:
+
 
 _BDOS_function_table:
 	dw _BDOS_00, _BDOS_01, _BDOS_02, _BDOS_03, _BDOS_04, _BDOS_05, _BDOS_06, _BDOS_07
 	dw _BDOS_08, _BDOS_09, _BDOS_0A, _BDOS_0B, _BDOS_0C, _BDOS_0D, _BDOS_0E, _BDOS_0F
-	dw _BDOS_10, _BDOS_11, _BDOS_12, _BDOS_13, _BDOS_14, _BDOS_15, _BDOS_16, _BDOS_17
 _END_BDOS_function:
 
 _BDOS_over:
@@ -152,6 +161,7 @@ _int21:
 .int21_52: ; GET LOL (DUMMY)
 	xor bx, bx
 	mov es, bx
+	mov bx, 0xFFFF
 	iret
 .no_52:
 	cmp ah, 0x50
@@ -578,7 +588,6 @@ int21_26:
 	mov ax, 0x20CD ; INT 20
 	stosw
 	xor ax,ax ; TODO: MEMSZ
-	dec ax
 	stosw
 	
 	xor al,al
@@ -595,7 +604,7 @@ int21_26:
 	rep movsw
 
 	;xor ax, ax
-	mov cx, 0x007B
+	mov cx, 0x0075
 	rep stosw
 	
 	mov di, OSZ_BDOS
@@ -637,37 +646,12 @@ int21_28:	; FCB RANDOM BLOCK WRITE
 	ret
 
 
-
-
-	; TODO: IFS
-_BDOS_IFS:
-_BDOS_10:
-_BDOS_11:
-_BDOS_12:
-_BDOS_13:
-_BDOS_14:
-_BDOS_15:
-_BDOS_16:
-_BDOS_17:
-	; restore bx
-	mov bx, [bp+STK_BX]
-
-	mov al, ah
-	sub al, OSZ_DOS_IFS
-	mov ah, OSZ_I3F_IFS
-	int 0x3F
-	ret
-
-
 int21_39:	; mkdir
 int21_3A:	; rmdir
 int21_41:	; unlink
 
 int21_3B:	; set cwd
 
-int21_3E:	; CloseHandle
-int21_3F:	; ReadFile
-int21_40:	; WriteFile
 int21_42:	; seek
 int21_43:	; get/set file attrs
 int21_44:	; ioctl
@@ -680,11 +664,79 @@ int21_60:	; truename
 	ret
 
 
-int21_6C:	; CreateFileEx
 int21_3C:	; creat
+	mov si, 0x0012
+	jmp short _open
+
 int21_3D:	; open
-int21_5A:	; create temp file
+	mov si, 0x0001
+	jmp short _open
+
 int21_5B:	; create new file
+	mov si, 0x0010
+	jmp short _open
+
+int21_6C:	; CreateFileEx
+	xchg dx, si
+
+_open:
+	mov al, OSZ_IFS_OPEN
+	mov ah, OSZ_I3F_IFS
+	int 0x3F
+	test ax, ax
+	js .not_exist
+	clc
+	ret
+
+.not_exist:
+	mov al, 0x02
+	stc
+	ret
+
+int21_3E:	; CloseHandle
+	mov si, [bp+STK_BX]
+	mov al, OSZ_IFS_CLOSE
+	mov ah, OSZ_I3F_IFS
+	int 0x3F
+	xor ax, ax
+	ret
+
+int21_3F:	; ReadFile
+	sub sp, 4
+
+	mov si, [bp+STK_BX]
+	mov al, OSZ_IFS_READ
+	mov ah, OSZ_I3F_IFS
+	int 0x3F
+	or ax, ax
+	js .error
+
+	push ss
+	pop es
+	mov di, sp
+	mov si, [bp+STK_BX]
+	mov cx, OSZ_IFS_IOCTL_GET_FILE_SIZE
+	mov al, OSZ_IFS_IOCTL
+	mov ah, OSZ_I3F_IFS
+	int 0x3F
+	or ax, ax
+	js .error
+
+	mov ax, [es:di]
+	add sp, 4
+	ret
+
+.error:
+	xor ax, ax
+	add sp, 4
+	ret
+
+int21_40:	; WriteFile
+	mov al, 0x05
+	stc
+	ret
+
+int21_5A:	; create temp file
 	mov al, 0x02
 	stc
 	ret
@@ -844,21 +896,22 @@ _crt:
 	mov bp, sp
 	sub sp, SIZE_MAINSTACK
 
-	call _cmd_ver
+	call _cmd_mem
 
 	mov cx, 2000
 	call _beep
 	mov cx, 1000
 	call _beep
 
-	call _cmd_mem
+	call _cmd_ver
+
 	jmp short _loop
 
 _beep:
 	mov ah, BIOS_BEEP
 	call _call_bios
 
-	mov ah, OSZ_DOS_WAIT_TICK
+	;mov ah, OSZ_DOS_WAIT_TICK
 	mov cx, 200
 	call _BDOS_0B
 
@@ -924,8 +977,9 @@ _BDOS_00: ; EXIT
 
 _loop:
 	mov si, str_buff
-	mov ah, OSZ_DOS_GET_CWD
-	call _BDOS_entry
+	mov al, OSZ_IFS_GET_CWD
+	mov ah, OSZ_I3F_IFS
+	int 0x3F
 	lea dx, [si+2]
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
@@ -1026,10 +1080,9 @@ _loop:
 	rep movsb
 
 	mov dx, cmd_buffer
-	mov ah, OSZ_DOS_OPEN
-	call _BDOS_entry
-	test ax, ax
-	jns .load_exec
+	mov ah, 0x3D
+	int 0x21
+	jnc .load_exec
 
 .bad_cmd:
 	mov dx, bad_cmd_msg
@@ -1057,41 +1110,58 @@ _loop:
 	mov di, 0x0080
 	mov si, arg_buffer
 	mov ax, [bp+LOCAL_SIZE_ARG]
+	or ax, ax
+	jnz .arg_nosp
 	stosb
-	mov cx, ax
-	rep movsb
-	xor al,al
-	stosb
+	jmp short .arg_end
 
-	mov si, [bp+LOCAL_SAVED_HANDLE]
+.arg_nosp:
+	mov cx, ax
+	inc al
+	stosb
+	mov al, ' '
+	stosb
+	rep movsb
+
+.arg_end:
+	mov al, 0x0D
+	stosb
 
 	push es
 	pop ds
 
 	mov dx, COM_ORG_100
 	mov cx, MAX_COM_FILE
-	mov ah, OSZ_DOS_READ
-	call _BDOS_entry
+	mov bx, [bp+LOCAL_SAVED_HANDLE]
+	mov ah, 0x3F
+	int 0x21
 	;mov [bp+LOCAL_SIZE_APP_BIN], ax
 	mov di, ax
 
-	mov ah, OSZ_DOS_CLOSE
-	call _BDOS_entry
+	mov ah, 0x3E
+	int 0x21
 
 	push cs
 	pop es
 	mov cx, di
 	mov si, COM_ORG_100
 	mov bx, _psp_bdos
-	mov dx, [si]
-	mov ax, OSZ_I3F_HANDLE_MAGIC
-	int 0x3F
-
-	mov ax, dx
+	mov ax, [si]
 	cmp ax, 0xED31 ; XOR BP, BP - format1
 	jz short .magic_ok
 	cmp ax, 0xED33 ; XOR BP, BP - format2
-	jnz short .bad_magic
+	jz short .magic_ok
+	mov dx, ax
+	mov ax, OSZ_I3F_HANDLE_MAGIC
+	int 0x3F
+
+.bad_magic:
+	push cs
+	pop ds
+	mov dx, bad_magic_found_msg
+	mov ah, OSZ_DOS_PUTS
+	call _BDOS_entry
+	jmp _BDOS_00
 
 .magic_ok:
 	mov dx, ds
@@ -1116,14 +1186,6 @@ _loop:
 	xor di, di
 	sti
 	retf
-
-.bad_magic:
-	push cs
-	pop ds
-	mov dx, bad_magic_found_msg
-	mov ah, OSZ_DOS_PUTS
-	call _BDOS_entry
-	jmp _BDOS_00
 
 
 
@@ -1166,6 +1228,13 @@ _cmd_ver:
 	ret
 
 
+_cmd_reserved:
+	mov dx, cmd_reserved_msg
+	mov ah, OSZ_DOS_PUTS
+	call _BDOS_entry
+	ret
+
+
 _cmd_echo:
 	mov dx,arg_buffer
 	mov ah, OSZ_DOS_PUTS
@@ -1176,8 +1245,9 @@ _cmd_echo:
 
 _cmd_cd:
 	mov dx,arg_buffer
-	mov ah, OSZ_DOS_SET_CWD
-	call _BDOS_entry
+	mov al, OSZ_IFS_SET_CWD
+	mov ah, OSZ_I3F_IFS
+	int 0x3F
 	ret
 
 
@@ -1284,13 +1354,17 @@ _cmd_dir:
 	xor bx, bx
 .loop:
 	mov dx, dir_buff
-	mov ah, OSZ_DOS_ENUM_FILE
-	call _BDOS_entry
+	mov al, OSZ_IFS_ENUM_FILE
+	mov ah, OSZ_I3F_IFS
+	int 0x3F
 	cmp ax, 0
-	jg .continue
+	jg short .continue
 	jmp .end
 .continue:
-	push ax
+	xchg ax, bx
+	cmp byte [dir_buff+64], '.'
+	jz short .loop
+	push bx
 
 	mov al, ' '
 	int 0x29
@@ -1443,10 +1517,9 @@ _cmd_type:
 	push es
 
 	mov dx, arg_buffer
-	mov ah, OSZ_DOS_OPEN
-	call _BDOS_entry
-	test ax, ax
-	jns .file_ok
+	mov ah, 0x3D
+	int 0x21
+	jnc .file_ok
 
 	mov dx, nofile_msg
 	mov ah, OSZ_DOS_PUTS
@@ -1456,10 +1529,10 @@ _cmd_type:
 
 .file_ok:
 
-	mov si, ax
+	mov bx, ax
 
-	lds bx,[cs:_osz_systbl]
-	mov ax, [ds:bx+OSZ_SYSTBL_LASTMEM]
+	lds si, [cs:_osz_systbl]
+	mov ax, [ds:si+OSZ_SYSTBL_LASTMEM]
 	mov ds, ax
 	mov es, ax
 	
@@ -1469,15 +1542,22 @@ _cmd_type:
 	rep stosw
 	
 	xor dx, dx
-	mov ah, OSZ_DOS_READ
-	call _BDOS_entry
+	mov cx, 0xFFFF
+	mov ah, 0x3F
+	int 0x21
 
-	mov ah, OSZ_DOS_CLOSE
-	call _BDOS_entry
+	mov cx, ax
+	xor si, si
+.loop:
+	jcxz .loop_end
+	lodsb
+	int 0x29
+	dec cx
+	jmp .loop
+.loop_end:
 
-	xor dx, dx
-	mov ah, OSZ_DOS_PUTS
-	call _BDOS_entry
+	mov ah, 0x3E
+	int 0x21
 
 	call _crlf
 
@@ -1527,11 +1607,19 @@ cmd_table:
 	dw _cmd_exit
 	db 4, "type"
 	dw _cmd_type
+	db 4, "date"
+	dw _cmd_reserved
+	db 4, "time"
+	dw _cmd_reserved
+	db 3, "del"
+	dw _cmd_reserved
+	db 3, "ren"
+	dw _cmd_reserved
 	db 0
 
 
 ver_msg:
-	db "MEG OSZ ver ", 0
+	db "MEG-OS Z ver ", 0
 
 bad_cmd_msg:
 	db "Bad command or file name", 10, 0
@@ -1542,12 +1630,15 @@ bad_magic_found_msg:
 nofile_msg:
 	db "No such file or directory", 10, 0
 
+cmd_reserved_msg:
+	db "Feature not available", 10, 0
+
 uname_msg:
 	db "osz", 10, 0
 
-mem_1_msg		db "Memory: ", 0
+mem_1_msg		db "MEMORY: ", 0
 mem_2_msg		db "/", 0
-mem_prot_msg	db "Extend: ", 0
+mem_prot_msg	db "EXTEND: ", 0
 mem_kb_msg		db " KB", 10, 0
 
 int00_msg	db 10, "#DIV/0!", 10, 0

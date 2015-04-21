@@ -2,7 +2,7 @@
 ;;
 ;;  MEG OSZ - System common definitions
 ;;
-;;  Copyright (c) 1998-2014, MEG-OS project
+;;  Copyright (c) 1998-2015, MEG-OS project
 ;;  All rights reserved.
 ;;  
 ;;  Redistribution and use in source and binary forms, with or without modification, 
@@ -56,9 +56,6 @@
 %define BIOS_GET_TICK       0x0A
 %define BIOS_FD_STATUS      0x0B
 
-%define BIOS_READ_MASS      99999
-%define BIOS_WRITE_MASS     99999
-
 
 ;;  BDOS
 %define OSZ_DOS_EXIT        0x00
@@ -72,17 +69,6 @@
 %define OSZ_DOS_BEEP        0x09
 %define OSZ_DOS_GET_TICK    0x0A
 %define OSZ_DOS_WAIT_TICK   0x0B
-
-%define OSZ_DOS_IFS         0x10
-%define OSZ_DOS_GET_CWD     0x10
-%define OSZ_DOS_SET_CWD     0x11
-%define OSZ_DOS_OPEN        0x12
-%define OSZ_DOS_CLOSE       0x13
-%define OSZ_DOS_READ        0x14
-%define OSZ_DOS_WRITE       0x15
-%define OSZ_DOS_SEEK        0x16
-%define OSZ_DOS_ENUM_FILE   0x17
-%define OSZ_DOS_IOCTL       0x18
 
 
 ;;  IFS
@@ -98,19 +84,14 @@
 %define OSZ_IFS_IOCTL       0x09
 %define OSZ_IFS_INSTALL     0x0A
 
-
+%define	OSZ_IFS_IOCTL_GET_FILE_SIZE	0x0000
 
 ;;  INT 3F MULTIPLEX
 %define OSZ_I3F_IFS         0x10
 %define OSZ_I3F_HANDLE_MAGIC    0x55AA
 
 
-;;  TERMIOS
-%define OSZ_TERMIOS_IGNBRK  0x0001
-%define OSZ_TERMIOS_BRKINT  0x0002
-%define OSZ_TERMIOS_ICANON  0x0010
-%define OSZ_TERMIOS_ECHO    0x0020
-%define OSZ_TERMIOS_VMIN    0x0000
-%define OSZ_TERMIOS_VTIME   0x0001
 
+%define	OSZ_ERR_GENERIC		0xFFFF
+%define	OSZ_ERR_NOT_SUPPORTED	0xFFFE
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # Rakefile for OSZ
-# Copyright(C)2014 MEG-OS project, ALL RIGHTS RESERVED.
+# Copyright(C)2014,2015 MEG-OS project, ALL RIGHTS RESERVED.
 #
 require 'rake/clean'
 require 'rake/packagetask'
@@ -14,13 +14,12 @@ PATH_OUTPUT     = "bin/"
 PATH_SRC        = "src/"
 PATH_MISC       = "misc/"
 
-PATH_BOOT_FLP	= "#{PATH_OUTPUT}floppy.img"
+PATH_FULL_IMG	= "#{PATH_OUTPUT}full.img"
 PATH_CATARC     = "#{PATH_OUTPUT}catarc"
 
 APP_EXT			= ".com"
 
-PATH_FDBOOT_IPL = "#{PATH_OUTPUT}fdboot.bin"
-PATH_OS_SYS 	= "#{PATH_OUTPUT}osz.sys"
+PATH_OS_SYS 	= "#{PATH_OUTPUT}kernel.sys"
 
 
 SRCS = FileList["**/*.c"] << FileList["**/*.cpp"] << FileList["**/*.asm"]
@@ -30,23 +29,19 @@ CLEAN.include(FileList["#{PATH_OUTPUT}/**/*"])
 
 directory PATH_OUTPUT
 
-TARGET  = [ PATH_BOOT_FLP ]
-SUB_TASKS = [ :tools ]
+TASKS = [ :tools, :osz ]
 
-
-SUB_TASKS.each do |sub_task|
-  task sub_task => [sub_task.to_s + ":build"]
+TASKS.each do |t|
+  task t => [t.to_s + ":build"]
 end
-
 
 desc "Defaults"
-task :default => [PATH_OUTPUT, SUB_TASKS, TARGET].flatten do |t|
-end
+task :default => [PATH_OUTPUT, TASKS].flatten
 
 
 desc "Run with qemu"
 task :run => :default do
-  sh "qemu-system-x86_64 -k ja -m 256 -boot a -fda #{ PATH_BOOT_FLP } -localtime -M pc"
+  sh "qemu-system-x86_64 -k ja -m 256 -boot a -fda #{ PATH_FULL_IMG } -localtime -M pc"
 end
 
 
@@ -54,7 +49,7 @@ desc "Run with Cable3"
 task :cable3 => :default do
   begin
     sh "stty cbreak raw -echo min 0"
-    sh "./cable3/8086tiny ./cable3/bios #{ PATH_BOOT_FLP }"
+    sh "./cable3/8086tiny ./cable3/bios #{ PATH_FULL_IMG }"
   ensure
     sh "stty cooked echo"
   end
@@ -63,7 +58,7 @@ end
 
 desc "Run with 8086run"
 task :run86 => :default do
-  sh "./8086run/8086run #{ PATH_BOOT_FLP }"
+  sh "./8086run/8086run #{ PATH_FULL_IMG }"
 end
 
 
@@ -74,8 +69,7 @@ namespace :tools do
 
   targets = [ PATH_CATARC ]
 
-  task :build => [targets].flatten do
-  end
+  task :build => [targets].flatten
 
   file "#{PATH_CATARC}" => "#{PATH_SRC}catarc.cpp" do |t|
     sh "#{ CC } -o #{t.name} #{t.prerequisites.join(' ')}"
@@ -84,7 +78,8 @@ namespace :tools do
 end
 
 def make_disk(output, ipl, files)
-  file output => [ PATH_CATARC, ipl, files].flatten do |t|
+  #puts "MAKEDISK #{ output } <= #{ ipl } #{ files.join (' ') }"
+  file output => [ 'Rakefile', PATH_CATARC, ipl, files].flatten do |t|
     sh "#{ PATH_CATARC } --bs #{ ipl } #{ t.name } '#{ files.join("' '") }'"
   end
 end
@@ -96,26 +91,86 @@ namespace :osz do
 
   PATH_OSZ_INC = "#{ PATH_SRC}osz.inc"
 
-  # normal apps
-  APPS = %w(hello chars chars2 echo2 cpuid pipo test).collect do |t|
+  ALL_OBJS = []
+
+  # make kernel mods
+  def make_mod(name)
+    t = name
+    bin = "#{ PATH_OUTPUT }#{ t }.bin"
+    src = "#{ PATH_SRC }#{ t }.asm"
+    file bin => [src, PATH_OSZ_INC] do |t|
+      sh "#{ AS } #{ AFLAGS } -o #{t.name} #{ src }"
+    end
+    ALL_OBJS.push bin
+    bin
+  end
+
+  # make normal apps
+  def make_app(name)
+    t = name
     bin = "#{ PATH_OUTPUT }#{ t }#{ APP_EXT }"
     src = "#{ PATH_SRC }#{ t }.asm"
     file bin => [src, PATH_OSZ_INC] do |t|
       sh "#{ AS } #{ AFLAGS } -o #{t.name} #{ src }"
     end
+    ALL_OBJS.push bin
     bin
   end
 
+  def make_kernel(output, locore, files)
+    file output => [ 'Rakefile', locore, files].flatten do |t|
+
+      size_dirent = 8
+
+      bin_locore = IO.binread(locore).unpack('C*')
+      puts "LOCORE: #{ locore } (#{ bin_locore.length })"
+
+      dir = []
+
+      blob = []
+      files.each do |file|
+        dirent = Array.new(size_dirent, 0)
+        name = File.basename(file, '.*').upcase
+        bin = IO.binread(file).unpack('C*')
+        dirent[0] = bin.length & 0xFF
+        dirent[1] = (bin.length>>8) & 0xFF
+        name.unpack('C*').each_with_index do |c, i|
+          dirent[2+i] = c
+        end
+        puts " + #{ name } <= #{ file } (#{ bin.length })"
+        dir += dirent.slice(0, size_dirent)
+        blob += bin
+      end
+      dir += Array.new(size_dirent, 0)
+
+      obj = bin_locore + dir + blob
+      size = obj.length
+      raise "#{ output }: Out of Segment!" if size >= 0x10000
+      obj[5] = files.length
+      obj[6] = size & 0xFF
+      obj[7] = (size >> 8) & 0xFF
+      offset = bin_locore.length + dir.length
+      obj[8] = offset & 0xFF
+      obj[9] = (offset >> 8) &0xFF
+
+      puts "OUTPUT: #{ obj.length }"
+      IO.write(t.name, obj.pack('C*'))
+    end
+  end
+
+
+  # normal apps
+  APP_DEFAULTS = %w(hello chars echo2 bf pipo ).collect {|t| make_app(t) }
+  APP_NO_DEFAULTS = %w(cpuid).collect {|t| make_app(t) }
+
   # extras
   EXTRAS = [
-    "#{PATH_SRC}hello.asm",
     FileList["extras/*"]
     ].flatten
 
   # tfdisk
   PATH_TFDISK_SRC = "#{ PATH_SRC }tfdisk/tfdisk.asm"
   PATH_TFDISK_BIN = "#{ PATH_OUTPUT }tfdisk#{ APP_EXT }"
-  APPS << PATH_TFDISK_BIN
 
   PATH_TFMBR_BIN = "#{ PATH_OUTPUT }tfmbr.bin"
   PATH_EXIPL_BIN = "#{ PATH_OUTPUT }exboot.bin"
@@ -136,32 +191,54 @@ namespace :osz do
       "-DPATH_IPL16=\\\"#{File.expand_path(PATH_IPL16_BIN)}\\\"",
       "-DPATH_IPL32=\\\"#{File.expand_path(PATH_IPL32_BIN)}\\\"",
       PATH_TFDISK_SRC].join(' ')
-    end
+  end
+  ALL_OBJS << PATH_TFDISK_BIN
+  APP_NO_DEFAULTS << PATH_TFDISK_BIN
+
 
   # kernel
-  OSZ_MODS = %w(osz2boot oszbio oszn98 fat12 oszre oszdos).collect do |t|
-    bin = "#{ PATH_OUTPUT }mod_#{ t }.bin"
-    src = "#{ PATH_SRC }#{ t }.asm"
-    file bin => [src, PATH_OSZ_INC] do |t|
-      sh "#{ AS } #{ AFLAGS } -o #{t.name} #{ src }"
+  OSZ_LOCORE = make_mod('osz2boot')
+  OSZ_MODS = %w(oszbio oszn98 fat12 oszdos).collect {|t| make_mod(t) }
+  make_kernel PATH_OS_SYS, OSZ_LOCORE, OSZ_MODS
+
+
+  # ipls
+  IPLS = {}
+  %w(F0_1440 F9_720 FE_1232).each do |ipl|
+    srcipl = "#{ PATH_SRC }fdipl.asm"
+
+    bpbsrc = "#{ PATH_SRC }bpb_#{ ipl }.asm"
+    bpbbin = "#{ PATH_OUTPUT }bpb_#{ ipl }.bin"
+    file bpbbin => bpbsrc do |t|
+      sh "#{ AS } #{ AFLAGS } -o #{ t.name } #{ t.prerequisites.join(' ') }"
     end
-    bin
-  end
 
-  file PATH_OS_SYS => OSZ_MODS do |t|
-    sh "cat #{ t.prerequisites.join(' ') } > #{ t.name }"
-  end
-
-  # misc
-  [ PATH_FDBOOT_IPL ].each do |bin|
-    src = PATH_SRC + File.basename(bin, ".bin") + ".asm"
-    file bin => src do |t|
-      sh "#{ AS } #{ AFLAGS } -o #{t.name} #{t.prerequisites.join(' ')}"
+    output = "#{ PATH_OUTPUT }ipl_#{ ipl }.bin"
+    file output => [srcipl, bpbbin] do |t|
+      sh "#{ AS } #{ AFLAGS } -o #{t.name} #{ srcipl } -DPATH_BPB=\\\"#{ File.expand_path(bpbbin) }\\\""
     end
+
+    IPLS[ipl.to_sym] = output
   end
 
-  # fd image
-  ROOT_FILES = [PATH_OS_SYS, APPS, EXTRAS].flatten.sort {|a, b| File.basename(a).upcase <=> File.basename(b).upcase }
-  make_disk(PATH_BOOT_FLP, PATH_FDBOOT_IPL, ROOT_FILES)
+
+  # images
+  APP_FULL = [APP_DEFAULTS, APP_NO_DEFAULTS]
+  IMAGES = []
+  [
+    { name: :mini, ipl: :F0_1440, files: [APP_DEFAULTS, EXTRAS] },
+    { name: :full98, ipl: :FE_1232, files: [APP_FULL, EXTRAS] },
+    { name: :full, ipl: :F0_1440, files: [APP_FULL, EXTRAS] }
+  ].each do |imgdef|
+    output = "#{ PATH_OUTPUT }#{ imgdef[:name] }.img"
+    files = [imgdef[:files]].flatten.sort {|a, b| File.basename(a).upcase <=> File.basename(b).upcase }
+    files.unshift PATH_OS_SYS
+    make_disk output, IPLS[imgdef[:ipl]], files
+    IMAGES << output
+  end
+
+
+  desc "Build OSZ"
+  task :build => [ALL_OBJS, IMAGES].flatten
 
 end

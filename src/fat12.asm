@@ -75,7 +75,7 @@ _crt:
 	mov [es:bx], word _int3F
 	mov [es:bx+2], cs
 
-	call _fat12_init
+	call _set_need_initialize
 	
 	mov ax, (SIZE_BSS + _END-_HEAD)/16
 	retf
@@ -94,21 +94,45 @@ _int3F:
 _int3F_old	dd 0
 
 _int3F_ifs:
+	push es
+	push ds
+	push bp
+	push di
+	push si
+	push bx
+	push dx
+	push cx
+
 	xchg ax, bx
 	xor bh, bh
 	add bx, bx
 	call [cs:_IFS_func_tbl + bx]
+
+	pop cx
+	pop dx
+	pop bx
+	pop si
+	pop di
+	pop bp
+	pop ds
+	pop es
 	iret
 
 
 _fat12_init:
+	push ds
+	push es
+	push ax
+	push cx
+	push dx
+	push bx
+	push si
+	push di
+
 	push cs
 	pop ds
 	push cs
 	pop es
-
-	push si
-	push di
 
 	xor ax, ax
 	mov di, _fat12_fat_buffer
@@ -204,9 +228,30 @@ _fat12_init:
 
 .end_scan_root:
 
+	mov [_need_init], byte 0
+
 _end_init:
 	pop di
 	pop si
+	pop bx
+	pop dx
+	pop cx
+	pop ax
+	pop es
+	pop ds
+	ret
+
+_set_need_initialize:
+	mov [cs:_need_init], byte 1
+	ret
+
+_init_if_need:
+	cmp [cs:_need_init], byte 0
+	jz .no_init
+
+	call _fat12_init
+
+.no_init:
 	ret
 
 
@@ -228,6 +273,8 @@ _fat12_enum_file:
 	push cs
 	pop ds
 	
+	call _init_if_need
+
 	mov di, dx
 	mov bx, ax
 	mov si, ax
@@ -452,6 +499,8 @@ _fat12_open:
 	push cs
 	pop ds
 
+	call _init_if_need
+
 	xor ax, ax
 .loop_find:
 	mov dx,_dir_buff
@@ -479,7 +528,7 @@ _fat12_open:
 	jmp short .loop_find
 
 .nofile:
-	mov ax, 0xFFFF
+	mov ax, OSZ_ERR_GENERIC
 	ret
 
 .found:
@@ -512,9 +561,12 @@ _fat12_get_cwd:
 
 
 _fat12_read:
+
+	call _init_if_need
+
 	cmp si, [cs:_n_root_entries]
 	jb .valid_handle
-	mov ax, -1
+	mov ax, OSZ_ERR_GENERIC
 	ret
 
 .valid_handle:
@@ -607,6 +659,33 @@ _fat12_read:
 	ret
 
 
+_fat12_ioctl:
+	cmp cx, OSZ_IFS_IOCTL_GET_FILE_SIZE
+	jz short _fat12_ioctl_get_file_size
+	mov ax, OSZ_ERR_NOT_SUPPORTED
+	ret
+
+_fat12_ioctl_get_file_size:
+	cmp si, [cs:_n_root_entries]
+	jb .valid_handle
+	mov ax, OSZ_ERR_GENERIC
+	ret
+
+.valid_handle:
+
+	mov cl, 5
+	shl si, cl
+	add si, _fat12_dir_buffer
+	mov ax, [cs:si + 0x1C]
+	mov dx, [cs:si + 0x1E]
+
+	mov [es:di], ax
+	mov [es:di+2], dx
+
+	mov ax, 0x0004
+	ret
+
+
 _to_lower:
 	cmp al, 'A'
 	jb .noa
@@ -630,6 +709,8 @@ _IFS_func_tbl:
 	dw _fat12_nop; write
 	dw _fat12_nop; seek
 	dw _fat12_enum_file
+	dw _fat12_nop; fast find
+	dw _fat12_ioctl
 
 
 _fat12_packet:
@@ -637,19 +718,6 @@ _fat12_packet:
 	dw 0x0001
 	dd 0
 	dd 0, 0
-
-
-	; internal BPB
-_current_disk_id	dw 0
-_n_sectors_fat		db 0
-_n_sectors_root_dir	db 0
-_begin_root_dir		dw 0
-_begin_clust_2		dw 0
-_sector_shift		db 0
-_cluster_shift		db 0
-_clst_byte			dw 0
-_clst_para			dw 0
-_n_root_entries		dw 0
 
 
 	; Compressed internal BPB
@@ -665,6 +733,20 @@ _bpb_table:
 	dw 0x4C08 ; 2HD CHRN(77,2,8,3) 1232KB
 	db 2, 6, 3, 0
 	db 0
+
+
+	; internal BPB
+_current_disk_id	dw 0
+_n_sectors_fat		db 0
+_n_sectors_root_dir	db 0
+_begin_root_dir		dw 0
+_begin_clust_2		dw 0
+_sector_shift		db 0
+_cluster_shift		db 0
+_clst_byte			dw 0
+_clst_para			dw 0
+_n_root_entries		dw 0
+_need_init			db 0
 
 _dummy_path	db 3, "//A"
 

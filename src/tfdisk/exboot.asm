@@ -215,7 +215,7 @@ fragment_msg	db "FRAGMENTED",0
 sysname:
 	db (end_sysname_string-sysname_string)/2
 sysname_string:
-	dw 'o','s','z','.','s','y','s'
+	dw 'k','e','r','n','e','l','.','s','y','s'
 end_sysname_string:
 
 	times 001FEh-($-$$) db 0

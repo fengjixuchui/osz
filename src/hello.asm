@@ -1,5 +1,5 @@
 ; Hello World for OSZ/DOS
-; PUBLIC DOMAIN
+; WTFPL/PUBLIC DOMAIN
 [bits 16]
 [org 0x0100]
 

@@ -229,7 +229,7 @@ fat2    dd 0x0000
 ;_lba_enabled	db 0
 
 				;;  FILENAMEEXT
-sysname			db "OSZ     SYS"
+sysname			db "KERNEL  SYS"
 nosystem_msg	db "Missing OS",13,10,0
 diskioerr_msg	db "I/O error",13,10,0
 
