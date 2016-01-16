@@ -40,25 +40,13 @@ task :default => [PATH_OUTPUT, TASKS].flatten
 
 
 desc "Run with qemu"
-task :run => :default do
+task :runqemu => :default do
   sh "qemu-system-x86_64 -k ja -m 256 -boot a -fda #{ PATH_FULL_IMG } -localtime -M pc"
 end
 
-
-desc "Run with Cable3"
-task :cable3 => :default do
-  begin
-    sh "stty cbreak raw -echo min 0"
-    sh "./cable3/8086tiny ./cable3/bios #{ PATH_FULL_IMG }"
-  ensure
-    sh "stty cooked echo"
-  end
-end
-
-
 desc "Run with 8086run"
-task :run86 => :default do
-  sh "./8086run/8086run #{ PATH_FULL_IMG }"
+task :run => :default do
+  sh "./8086run/8086run -strict #{ PATH_FULL_IMG }"
 end
 
 
