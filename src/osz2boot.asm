@@ -1,20 +1,20 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG OSZ - lcoore (Second boot loader)
+;;	MEG-OS Z - lcoore (Second boot loader)
 ;;
-;;	Copyright (c) 2014,2015 MEG-OS project
+;;	Copyright (c) 1998-2016 MEG-OS project
 ;;	All rights reserved.
 ;;
-;;	Redistribution and use in source and binary forms, with or without modification, 
+;;	Redistribution and use in source and binary forms, with or without modification,
 ;;	are permitted provided that the following conditions are met:
-;;	
+;;
 ;;	* Redistributions of source code must retain the above copyright notice, this
 ;;	  list of conditions and the following disclaimer.
-;;	
+;;
 ;;	* Redistributions in binary form must reproduce the above copyright notice, this
 ;;	  list of conditions and the following disclaimer in the documentation and/or
 ;;	  other materials provided with the distribution.
-;;	
+;;
 ;;	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ;;	ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 ;;	WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -31,7 +31,7 @@
 
 ; 0x0201 = 1.2
 %define	VER_MAJ_MIN		0x0000
-%define	VER_REVISION	0x0006
+%define	VER_REVISION	0x0007
 %define	IPL_SIGN		0x1eaf
 
 %define	ORG_BASE		0x0800
@@ -44,21 +44,16 @@
 _HEAD:
 	db "EM"
 	jmp short _legacy_entry
-	db 0
-n_files		db 0
 file_size	dw 0
 offset_data	dw 0
+offset_ramd	dw 0
+size_ramd	dw 0 ;
 
 _legacy_entry:
 	xor ax, IPL_SIGN
 	jz short _crt
 forever:
 	jmp short forever
-
-_int3F:
-	xor ax, ax
-	iret
-
 
 _next:
 
@@ -78,6 +73,9 @@ _next:
 	pop es
 	pop ds
 	mov bx, _osz_systbl
+	mov al, [es:bx + OSZ_SYSTBL_ARCH]
+	mov cl, [es:bx + OSZ_SYSTBL_CPUID]
+	mov dx, [es:bx + OSZ_SYSTBL_BIOS]
 
 	push cs
 	call _invoke
@@ -88,14 +86,13 @@ _next:
 	pop bx
 	add dx, ax
 	mov es, dx
-	add bx, byte 8
+	add bx, byte 2
 	jmp short .load_loop
 
 _invoke:
-	mov cx, 0x0004
+	mov bp, [ds:0x0002]
 	push ds
-	push cx
-	xor ax, ax
+	push bp
 	retf
 
 
@@ -110,7 +107,7 @@ _crt:
 	mov ss, ax
 	mov sp, ORG_BASE
 	push cx
-	
+
 	push cs
 	pop ds
 
@@ -136,12 +133,18 @@ _crt:
 	stosw
 
 	xor ax, ax
-	mov cx, 3
+	stosw
 	stosw
 
-	mov [es:0x00FC], word _int3F
-	mov [es:0x00FE], es
-	
+	mov ax, cs
+	mov dx, [offset_ramd-ORG_BASE]
+	mov cl, 4
+	shr dx, cl
+	add ax, dx
+	stosw
+	mov ax, [size_ramd-ORG_BASE]
+	stosw
+
 	mov ax, _next
 	push es
 	push ax
@@ -150,7 +153,12 @@ _crt:
 _DETECT_CPUID:
 	mov di, _osz_systbl + OSZ_SYSTBL_CPUID
 
-	mov dx,0xF000
+	mov cx, 0x0121
+	shl ch, cl
+	jnz short .no8086
+	jmp .end_cpu
+.no8086
+	mov dx, 0xF000
 	pushf
 	pop ax
 	mov cx, ax
@@ -159,23 +167,26 @@ _DETECT_CPUID:
 	popf
 	pushf
 	pop ax
-	and ax,dx
-	cmp ax,dx
-	jz short .end_cpu
+	and ax, dx
+	cmp ax, dx
+	jnz .ov286
+	mov byte [es:di], 1
+	jmp short .end_cpu
+.ov286:
 
-	or cx,dx
+	or cx, dx
 	push cx
 	popf
 	pushf
 	pop ax
-	and ax,dx
+	and ax, dx
 	mov byte [es:di], 2
 	jz short .end_cpu
 
 	pushfd
 	pop eax
-	mov ecx,eax
-	xor eax,0x00040000
+	mov ecx, eax
+	xor eax, 0x00040000
 	push eax
 	popfd
 	xor eax,ecx
@@ -183,26 +194,26 @@ _DETECT_CPUID:
 	jz short .end_cpu
 	push ecx
 	popfd
-	
-	mov eax,ecx
-	xor eax,0x00200000
+
+	mov eax, ecx
+	xor eax, 0x00200000
 	push eax
 	popfd
 	pushfd
 	pop eax
-	xor eax,ecx
+	xor eax, ecx
 	mov byte [es:di], 4
 	jz short .env_no_cpuid
 
 	mov byte [es:di], 5
 
-	mov eax,0x80000000
+	mov eax, 0x80000000
 	cpuid
-	cmp eax,0x80000000
+	cmp eax, 0x80000000
 	jbe .env_no_cpuid80000000
-	mov eax,0x80000001
+	mov eax, 0x80000001
 	cpuid
-	bt edx,29
+	bt edx, 29
 	jnc short .env_no_amd64
 	mov byte [es:di], 6
 .env_no_amd64:
@@ -214,12 +225,10 @@ _DETECT_CPUID:
 	mov dx, (ORG_BASE + _END_RESIDENT - _HEAD)/16
 	mov es, dx
 
-	mov cl, [n_files-ORG_BASE]
 	mov bx, _END-ORG_BASE
 	mov si, [offset_data-ORG_BASE]
 
 	retf
 
+	alignb 16
 _END:
-
-

@@ -4,17 +4,17 @@
 ;;
 ;;	Copyright (c) 2014,2015 MEG-OS project
 ;;	All rights reserved.
-;;	
-;;	Redistribution and use in source and binary forms, with or without modification, 
+;;
+;;	Redistribution and use in source and binary forms, with or without modification,
 ;;	are permitted provided that the following conditions are met:
-;;	
+;;
 ;;	* Redistributions of source code must retain the above copyright notice, this
 ;;	  list of conditions and the following disclaimer.
-;;	
+;;
 ;;	* Redistributions in binary form must reproduce the above copyright notice, this
 ;;	  list of conditions and the following disclaimer in the documentation and/or
 ;;	  other materials provided with the distribution.
-;;	
+;;
 ;;	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ;;	ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 ;;	WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -72,13 +72,12 @@
 %define	STK_FLAGS				22
 
 
+CPU 8086
 [bits 16]
 
 _HEAD:
-	db 0xC3, 0x5A
-	dw (_BSS-_HEAD)/16
-
-	jmp _crt
+	db 0xCB, 0x1A
+	dw _init
 
 
 	alignb 4
@@ -339,7 +338,7 @@ _BDOS_05:
 .has_key:
 	mov ah, BIOS_CONIN
 	call _call_bios
-	
+
 	cmp al, 0x03
 	jnz short .no_break
 
@@ -351,7 +350,7 @@ _BDOS_05:
 	jmp _BDOS_00
 	;xor bx,bx
 	;jmp short .end
-	
+
 .no_break:
 
 	cmp al, 0x0D ; cr
@@ -363,7 +362,7 @@ _BDOS_05:
 	call _crlf
 
 	jmp short .end
-		
+
 .no_crlf:
 
 	cmp al, 0x1B
@@ -429,7 +428,7 @@ _BDOS_05:
 	pop di
 	pop si
 	pop bx
-	
+
 	ret
 
 
@@ -589,7 +588,7 @@ int21_26:
 	stosw
 	xor ax,ax ; TODO: MEMSZ
 	stosw
-	
+
 	xor al,al
 	stosb
 	mov ax, 0xFFFF
@@ -606,7 +605,7 @@ int21_26:
 	;xor ax, ax
 	mov cx, 0x0075
 	rep stosw
-	
+
 	mov di, OSZ_BDOS
 	mov al, 0x9A
 	stosb
@@ -616,7 +615,7 @@ int21_26:
 	stosw
 	mov al, 0xC3
 	stosb
-	
+
 	mov di, PSP_SETVER
 	mov ax, FAKE_DOSVER
 	stosw
@@ -804,6 +803,13 @@ int21_6F:
 	ret
 
 
+	; FAST CONSOLE OUTPUT
+_int29:
+	push ax
+	mov ah, BIOS_CONOUT
+	call _call_bios
+	pop ax
+	iret
 
 
 %define	SIZE_MAINSTACK	16
@@ -814,13 +820,13 @@ int21_6F:
 %define	LOCAL_SIZE_APP_BIN		-10
 %define	LOCAL_MEMSZ				-12
 
-_crt:
+_init:
 	mov [_osz_systbl], bx
 	mov [_osz_systbl+2], es
 
 	mov ax, cs
 	add ax, (_END-_HEAD)/16
-	mov [es:bx+OSZ_SYSTBL_LASTMEM], ax
+	mov [_DOS_LASTMEM], ax
 
 	xor di, di
 	mov ax, _int00
@@ -849,7 +855,13 @@ _crt:
 	stosw
 	mov ax, cs
 	stosw
-	
+
+	mov di, 0x29*4
+	mov ax, _int29
+	stosw
+	mov ax, cs
+	stosw
+
 	mov cx, 3 ; 22 23 24
 .loop_int_nop:
 	mov ax, _int_nop
@@ -878,13 +890,12 @@ _crt:
 	xor ax, ax
 	rep stosw
 
-	les bx, [cs:_osz_systbl]
-	mov dx, [es:bx+OSZ_SYSTBL_LASTMEM]
+	mov dx, [cs:_DOS_LASTMEM]
 	mov [_ROOT_PSP], dx
 	mov [_CURRENT_PSP], dx
 	mov ax, dx
 	add ax, 0x0011
-	mov [es:bx+OSZ_SYSTBL_LASTMEM], ax
+	mov [cs:_DOS_LASTMEM], ax
 	call int21_26
 
 	push cs
@@ -928,8 +939,7 @@ _int27: ; DOS1+ TERMINATE AND STAY RESIDENT
 	mov cl, 4
 	shr dx, cl
 	sub dx, ax
-	les bx, [cs:_osz_systbl]
-	add [es:bx + OSZ_SYSTBL_LASTMEM], dx
+	add [cs:_DOS_LASTMEM], dx
 	jmp short _BDOS_00
 
 
@@ -1005,7 +1015,7 @@ _loop:
 	jmp short .loop_pre_cmd
 .end_pre_cmd:
 	mov di, cmd_buffer
-	xor bx, bx	
+	xor bx, bx
 .loop_cmd_token:
 	mov al, [si+bx]
 	cmp al, 0x20
@@ -1099,7 +1109,7 @@ _loop:
 	mov ax, [es:bx+OSZ_SYSTBL_MEMSZ]
 	mov [bp+LOCAL_MEMSZ], ax
 
-	mov dx, [es:bx+OSZ_SYSTBL_LASTMEM]
+	mov dx, [cs:_DOS_LASTMEM]
 	call int21_26
 
 	mov ax, [cs:_CURRENT_PSP]
@@ -1265,7 +1275,7 @@ _cmd_mem:
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
 	mov dx, [es:bx+OSZ_SYSTBL_MEMSZ]
-	sub dx, [es:bx+OSZ_SYSTBL_LASTMEM]
+	sub dx, [cs:_DOS_LASTMEM]
 	mov cl, 6
 	shr dx, cl
 	call _disp_dec
@@ -1305,7 +1315,7 @@ _disp_dec:
 	push cx
 	push bx
 	push di
-	
+
 	mov di, numbuff
 	mov ax, 0x2020
 	stosw
@@ -1340,7 +1350,7 @@ _disp_dec:
 	mov dx, bx
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
-	
+
 	pop di
 	pop bx
 	pop cx
@@ -1368,7 +1378,7 @@ _cmd_dir:
 
 	mov al, ' '
 	int 0x29
-	
+
 	mov si, dir_buff
 	mov cx, 8
 .loop_fn8:
@@ -1400,14 +1410,14 @@ _cmd_dir:
 	mov ax, dx
 	mov cl, 5
 	shr ax, cl
-	and ax, 0x000F
+	db 0x25, 0x0F, 0x00 ; and ax, 0x000F
 	call _disp_dec_02
 
 	mov al, '-'
 	int 0x29
 
 	mov ax, dx
-	and ax, 0x001F
+	db 0x25,  0x1F, 0x00 ; and ax, 0x001F
 	call _disp_dec_02
 
 	mov al, ' '
@@ -1426,7 +1436,7 @@ _cmd_dir:
 	mov ax, dx
 	mov cl, 5
 	shr ax, cl
-	and ax, 0x003F
+	db 0x25, 0x3F, 0x00 ; and ax, 0x003F
 	call _disp_dec_02
 
 	mov al, ' '
@@ -1464,9 +1474,9 @@ _cmd_dir:
 	mov dx, dir_buff + 64
 	mov ah, OSZ_DOS_PUTS
 	call _BDOS_entry
-	
+
 	call _crlf
-	
+
 	pop bx
 	jmp .loop
 .end:
@@ -1531,16 +1541,15 @@ _cmd_type:
 
 	mov bx, ax
 
-	lds si, [cs:_osz_systbl]
-	mov ax, [ds:si+OSZ_SYSTBL_LASTMEM]
+	mov ax, [cs:_DOS_LASTMEM]
 	mov ds, ax
 	mov es, ax
-	
+
 	xor di,di
 	mov cx, 0x8000
 	xor ax, ax
 	rep stosw
-	
+
 	xor dx, dx
 	mov cx, 0xFFFF
 	mov ah, 0x3F
@@ -1646,6 +1655,7 @@ int01_msg	db 10, "#DEBUG", 10, 0
 int03_msg	db 10, "#BREAKPOINT", 10, 0
 int04_msg	db 10, "#OVERFLOW", 10, 0
 
+_DOS_LASTMEM	dw 0
 _ROOT_PSP		dw 0
 _CURRENT_PSP	dw 0
 

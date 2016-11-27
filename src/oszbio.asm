@@ -1,20 +1,20 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG OSZ - BIOS for IBM PC
+;;	MEG-OS Z - BIOS for IBM PC
 ;;
-;;	Copyright (c) 2014,2015 MEG-OS project
+;;	Copyright (c) 1998-2016 MEG-OS project
 ;;	All rights reserved.
-;;	
-;;	Redistribution and use in source and binary forms, with or without modification, 
+;;
+;;	Redistribution and use in source and binary forms, with or without modification,
 ;;	are permitted provided that the following conditions are met:
-;;	
+;;
 ;;	* Redistributions of source code must retain the above copyright notice, this
 ;;	  list of conditions and the following disclaimer.
-;;	
+;;
 ;;	* Redistributions in binary form must reproduce the above copyright notice, this
 ;;	  list of conditions and the following disclaimer in the documentation and/or
 ;;	  other materials provided with the distribution.
-;;	
+;;
 ;;	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ;;	ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 ;;	WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -45,10 +45,8 @@
 [bits 16]
 
 _HEAD:
-	db 0xC3, 0x5A
-	dw (_END-_HEAD)/16
-
-	jmp near crt
+	db 0xCB, 0x1A
+	dw _init
 
 	alignb 2
 saved_imr	dw 0
@@ -89,15 +87,6 @@ __int1C:
 __int28:
 	sti
 	hlt
-	iret
-
-
-__int29:
-	push ax
-	mov ah, BIOS_CONOUT
-	push cs
-	call _bios_entry
-	pop ax
 	iret
 
 
@@ -154,10 +143,12 @@ _bios_conin:
 .wait:
 	int 0x28
 	jmp short .loop
-	
-	
+
+
 _bios_conout:
 	mov bx, 0x0007
+	cmp al, 0x1B ; SKIP ESC
+	jz short .end
 	cmp al, 0x0A
 	jz short .crlf
 	cmp al, 0x7F
@@ -201,37 +192,34 @@ _bios_cls:
 
 _bios_power:
 
-	; exit cable3 (8086tiny http://www.megalith.co.uk/8086tiny/)
+	; exit 8086tiny
 	xor bx, bx
 	mov ds, bx
 	mov [bx], byte 0xCB
 	call 0:0
-	
+
 	; APM shutdown
 	mov ax, 0x5301
 	;xor bx, bx
 	int 0x15
-	
+
 	mov ax, 0x530E
 	xor bx, bx
 	mov cx, 0x0102
 	int 0x15
-	
+
 	mov ax, 0x5307
 	mov bx, 0x0001
 	mov cx, 0x0003
 	int 0x15
-	
+
 	; then reboot
-	;mov al, 0xFF
-	;out 0x21, al
-	;out 0xA1, al
 	cli
 	mov al, 0xFE
 	out 0x64 ,al
 	mov al, 0x01
 	out 0x92, al
-	
+
 	int 0x19
 _forever:
 	hlt
@@ -267,7 +255,7 @@ _bios_init_disk:
 
 _bios_fd_read:
 	xor di,di
-	
+
 	mov ax,[si+0x08]
 	les bx,[si+0x04]
 	mov cx,[si+0x02]
@@ -287,7 +275,7 @@ _bios_fd_read:
 	pop cx
 	pop ax
 	jc short .end
-	
+
 	dec cx
 	jz short .end
 	inc di
@@ -346,27 +334,23 @@ _bios_beep:
 _bios_tick:
 	mov ax, [cs:tick_count]
 	mov dx, [cs:tick_count+2]
+	cmp ax, [cs:tick_count]
+	jnz _bios_tick
 	mov cx, _TIMER_RES
 	mov [bp+2], cx
 	mov [bp+4], dx
 	ret
 
 
-
-
 	alignb 16
 _END_RESIDENT:
+; ---------------------------------------------------------------------
 
-
-
-
-crt:
+_init:
 	; installation check
-	mov al, [es:bx + OSZ_SYSTBL_ARCH]
 	cmp al, 0x01
 	jnz .dont_install
-	mov ax, [es:bx + OSZ_SYSTBL_BIOS]
-	or ax, [es:bx + OSZ_SYSTBL_BIOS+2]
+	or dx, dx
 	jz .install_ok
 .dont_install:
 	xor ax,ax
@@ -398,10 +382,6 @@ crt:
 	stosw
 	mov ax, cs
 	stosw
-	mov ax, __int29
-	stosw
-	mov ax, cs
-	stosw
 
 	; mem lower
 	int 0x12
@@ -410,13 +390,22 @@ crt:
 	mov [es:bx + OSZ_SYSTBL_MEMSZ], ax
 
 	; mem middle
-	cmp [es:bx + OSZ_SYSTBL_CPUID], byte 2
+	cmp byte [es:bx + OSZ_SYSTBL_CPUID], 2
 	jb .no_extmem
 	mov ah, 0x88
 	int 0x15
 	jc .no_extmem
 	mov [es:bx + OSZ_SYSTBL_MEMPROT], ax
 .no_extmem:
+
+	;;	OADG A20
+	xor ax, ax
+	cmp [es:bx + OSZ_SYSTBL_MEMPROT], ax
+	jz .no_a20
+	in al,092h
+	or al,2
+	out 092h,al
+.no_a20:
 
 	; number of fd drives
 	int 0x11
@@ -430,6 +419,8 @@ crt:
 .no_fds:
 
 	; check lba bios
+	cmp byte [es:bx + OSZ_SYSTBL_CPUID], 3
+	jb .no_lba
 	mov dl, 0x80
 	mov bx, 0x55AA
 	mov ah, 0x41
@@ -442,15 +433,14 @@ crt:
 	mov [lba_enabled], bl
 .no_lba:
 
+
 	; misc
-	;mov ax, 0x0012
-	;int 0x10
-	mov al, 13
-	int 0x29
-	
+	mov ax, 0x0E0D
+	int 0x10
+
 	mov ax, (_END_RESIDENT-_HEAD)/16
 	retf
-	
+
 
 	alignb 16
 _END:

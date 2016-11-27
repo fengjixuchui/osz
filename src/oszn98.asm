@@ -1,20 +1,20 @@
 ;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG OSZ - BIOS for NEC PC-9800 Series Personal Computer
+;;	OSZ - BIOS for NEC PC-9800 Series Personal Computer
 ;;
 ;;	Copyright (c) 2014,2015 MEG-OS project
 ;;	All rights reserved.
-;;	
-;;	Redistribution and use in source and binary forms, with or without modification, 
+;;
+;;	Redistribution and use in source and binary forms, with or without modification,
 ;;	are permitted provided that the following conditions are met:
-;;	
+;;
 ;;	* Redistributions of source code must retain the above copyright notice, this
 ;;	  list of conditions and the following disclaimer.
-;;	
+;;
 ;;	* Redistributions in binary form must reproduce the above copyright notice, this
 ;;	  list of conditions and the following disclaimer in the documentation and/or
 ;;	  other materials provided with the distribution.
-;;	
+;;
 ;;	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ;;	ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 ;;	WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -56,10 +56,8 @@
 [bits 16]
 
 _HEAD:
-	db 0xC3, 0x5A
-	dw (_END-_HEAD)/16
-
-	jmp near crt
+	db 0xCB, 0x1A
+	dw _init
 
 	alignb 2
 saved_imr	dw 0
@@ -111,15 +109,6 @@ __irq00:
 __int28:
 	sti
 	hlt
-	iret
-
-
-__int29:
-	push ax
-	mov ah, BIOS_CONOUT
-	push cs
-	call _bios_entry
-	pop ax
 	iret
 
 
@@ -393,16 +382,16 @@ _bios_init_disk:
 _bios_fd_read:
 	push bp
 	xor di,di
-	
+
 	mov ax,[si+0x08]
 	les bp,[si+0x04]
 	mov cx,[si+0x02]
 	push cs
 	pop ds
-.loop:	
+.loop:
 	push ax
 	push cx
-	
+
 	div byte [current_fd_c_r]
 	mov dl, ah
 	xor dh, dh
@@ -415,11 +404,11 @@ _bios_fd_read:
 	mov al, [current_pda]
 	mov ah, 0x56
 	int 0x1B
-	
+
 	pop cx
 	pop ax
 	jc short .end
-	
+
 	dec cx
 	jz short .end
 	inc di
@@ -475,6 +464,8 @@ _bios_beep:
 _bios_tick:
 	mov ax, [cs:tick_count]
 	mov dx, [cs:tick_count+2]
+	cmp ax, [cs:tick_count]
+	jnz _bios_tick
 	mov cx, _TIMER_RES
 	mov [bp+2], cx
 	mov [bp+4], dx
@@ -486,14 +477,13 @@ np2_shutdown_cmd db "poweroff", 0
 	alignb 16
 _END_RESIDENT:
 
+; ---------------------------------------------------------------------
 
-crt:
+_init:
 	; installation check
-	mov al, [es:bx + OSZ_SYSTBL_ARCH]
 	or al, al
 	jnz .dont_install
-	mov ax, [es:bx + OSZ_SYSTBL_BIOS]
-	or ax, [es:bx + OSZ_SYSTBL_BIOS+2]
+	or dx, dx
 	jz .install_ok
 .dont_install:
 	xor ax,ax
@@ -533,10 +523,6 @@ crt:
 	stosw
 	mov di, 0x28*4
 	mov ax, __int28
-	stosw
-	mov ax, cs
-	stosw
-	mov ax, __int29
 	stosw
 	mov ax, cs
 	stosw
@@ -581,7 +567,7 @@ crt:
 	mov ax,0x0001
 	mov [es:0x0100],al
 	mov [es:0x0102],ax
-	
+
 	mov [cons_scroll], word 160*29
 
 .no_pegc:
@@ -589,7 +575,7 @@ crt:
 
 	; misc
 	call _bios_cls
-	
+
 	mov ax, (_END_RESIDENT-_HEAD)/16
 	retf
 

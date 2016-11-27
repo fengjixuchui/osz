@@ -51,7 +51,7 @@ initAT:
 	mov ax,(main0-_HEAD)
 	push ax
 	retf
-	
+
 main0:
 	push cs
 	pop ds
@@ -116,9 +116,6 @@ _next:
 	add ax, si
 	mov [fat2], ax
 
-	mov ax, 0x0E2E
-	int 0x10
-
 	;; READ FIRST CLUSTER
 	push es
 	xor bp, bp
@@ -127,21 +124,18 @@ _next:
 	mov cx, [0x000B]
 	call diskread
 
+	;; CHECK HEADER
 	cmp word [es:0x0000], "EM"
 	jz sys_ok
 	jmp forever
 
 sys_ok:
-	mov ax, 0x0E2E
-	int 0x10
-
-	mov cx, [es:0x0006]
+	;; READ TRAIL CLUSTERS
+	mov cx, [es:0x0004]
 	sub cx, [0x000B]
 	call diskread
 
-	mov ax, 0x0E2E
-	int 0x10
-
+	;; JUMP TO KERNEL
 	mov ax, IPL_SIGN
 	mov cx, [_arch]
 _retf:

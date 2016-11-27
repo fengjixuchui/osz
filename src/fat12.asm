@@ -4,17 +4,17 @@
 ;;
 ;;	Copyright (c) 1998-2014, MEG-OS project
 ;;	All rights reserved.
-;;	
-;;	Redistribution and use in source and binary forms, with or without modification, 
+;;
+;;	Redistribution and use in source and binary forms, with or without modification,
 ;;	are permitted provided that the following conditions are met:
-;;	
+;;
 ;;	* Redistributions of source code must retain the above copyright notice, this
 ;;	  list of conditions and the following disclaimer.
-;;	
+;;
 ;;	* Redistributions in binary form must reproduce the above copyright notice, this
 ;;	  list of conditions and the following disclaimer in the documentation and/or
 ;;	  other materials provided with the distribution.
-;;	
+;;
 ;;	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ;;	ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 ;;	WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -46,12 +46,14 @@
 %define	MAX_FILENAME		64
 
 
+CPU 8086
 [bits 16]
-_HEAD:
-	db 0xC3, 0x5A
-	dw (_END-_HEAD)/16
 
-_crt:
+_HEAD:
+	db 0xCB, 0x1A
+	dw _init
+
+_init:
 	mov [_osz_systbl], bx
 	mov [_osz_systbl+2], es
 
@@ -67,7 +69,7 @@ _crt:
 	xor ax, ax
 	mov es, ax
 	mov bx, 0x3F*4
-	
+
 	mov ax, [es:bx]
 	mov cx, [es:bx+2]
 	mov [_int3F_old], ax
@@ -76,7 +78,7 @@ _crt:
 	mov [es:bx+2], cs
 
 	call _set_need_initialize
-	
+
 	mov ax, (SIZE_BSS + _END-_HEAD)/16
 	retf
 
@@ -267,12 +269,12 @@ _fat12_enum_file:
 	push bp
 	mov bp, sp
 	sub sp, ENUM_SIZE_STACK
-	
+
 	push ds
 	pop es
 	push cs
 	pop ds
-	
+
 	call _init_if_need
 
 	mov di, dx
@@ -285,7 +287,7 @@ _fat12_enum_file:
 .loop:
 	cmp [_n_root_entries], bx
 	jbe short .end_over
-	
+
 	mov al, [si]
 	or al, al ; end of dir
 	jz short .end_over
@@ -320,7 +322,7 @@ _fat12_enum_file:
 	pop ds
 	ret
 
-	
+
 .end_over:
 	xor ax,ax
 	jmp short .end
@@ -342,7 +344,7 @@ _fat12_enum_file:
 	add dl, [si+bx]
 	inc bx
 	loop .loop_sum
-	
+
 	xor ax, ax
 	xor bx, bx
 .lfn_loop:
@@ -507,7 +509,7 @@ _fat12_open:
 	call _fat12_enum_file
 	mov cx, ax
 	jcxz .nofile
-	
+
 	mov si, _dir_buff + 64
 	xor bx, bx
 .loop_cmp:
@@ -598,16 +600,16 @@ _fat12_read:
 	jz short .end_z
 
 	mov si, _fat12_packet
-	
+
 	mov ax, dx
-	and ax, 0x000F
+	db 0x25, 0x0F, 0x00 ; and ax, 0x000F
 	mov [cs:si+4], ax
 	mov cl, 4
 	shr dx, cl
 	mov ax, ds
 	add ax, dx
 	mov [cs:si+6], ax
-	
+
 	push cs
 	pop ds
 

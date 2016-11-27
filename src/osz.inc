@@ -4,17 +4,17 @@
 ;;
 ;;  Copyright (c) 1998-2015, MEG-OS project
 ;;  All rights reserved.
-;;  
-;;  Redistribution and use in source and binary forms, with or without modification, 
+;;
+;;  Redistribution and use in source and binary forms, with or without modification,
 ;;  are permitted provided that the following conditions are met:
-;;  
+;;
 ;;  * Redistributions of source code must retain the above copyright notice, this
 ;;    list of conditions and the following disclaimer.
-;;  
+;;
 ;;  * Redistributions in binary form must reproduce the above copyright notice, this
 ;;    list of conditions and the following disclaimer in the documentation and/or
 ;;    other materials provided with the distribution.
-;;  
+;;
 ;;  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ;;  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 ;;  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -39,7 +39,9 @@
 %define OSZ_SYSTBL_REVISION 0x0A ; WORD
 %define OSZ_SYSTBL_MEMSZ    0x0C ; WORD (IN PARA)
 %define OSZ_SYSTBL_MEMPROT  0x0E ; WORD (IN KB)
-%define OSZ_SYSTBL_LASTMEM  0x10 ; WORD (SEG)
+%define OSZ_SYSTBL_RAMD     0x10 ; WORD (SEG)
+%define OSZ_SYSTBL_RAMDSZ   0x12 ; WORD (TEMP)
+%define OSZ_SYSTBL_ACPI     0x14 ; FAR16PTR
 
 
 ;;  BIOS
@@ -94,4 +96,3 @@
 
 %define	OSZ_ERR_GENERIC		0xFFFF
 %define	OSZ_ERR_NOT_SUPPORTED	0xFFFE
-
