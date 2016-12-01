@@ -182,7 +182,7 @@ namespace :osz do
 
   # normal apps
   APP_DEFAULTS = %w(hello chars echo2 bf pipo ).collect {|t| make_app(t) }
-  APP_NO_DEFAULTS = %w(cpuid).collect {|t| make_app(t) }
+  APP_NO_DEFAULTS = %w(acpi cpuid).collect {|t| make_app(t) }
 
   # extras
   EXTRAS = [

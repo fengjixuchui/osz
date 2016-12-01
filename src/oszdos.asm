@@ -237,7 +237,6 @@ _int2526: ; DOS1+ ABSOLUTE DISK I/O (DUMMY)
 _BDOS_unknown:
 _BDOS_06:
 _BDOS_07:
-_BDOS_0C:
 _BDOS_0D:
 _BDOS_0E:
 _BDOS_0F:
@@ -460,6 +459,15 @@ _BDOS_08:
 	mov ax, [es:bx + OSZ_SYSTBL_VERSION]
 	ret
 
+	; OSZ_DOS_GET_ACPI
+_BDOS_0C:
+	les bx,[cs:_osz_systbl]
+	mov cx, [es:bx+OSZ_SYSTBL_ACPI]
+	mov dx, [es:bx+OSZ_SYSTBL_ACPI+2]
+	mov [bp+STK_BX], cx
+	mov [bp+STK_ES], dx
+	xor ax, ax
+	ret
 
 	; GET TICK
 _BDOS_0A:

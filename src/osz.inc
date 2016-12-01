@@ -71,6 +71,7 @@
 %define OSZ_DOS_BEEP        0x09
 %define OSZ_DOS_GET_TICK    0x0A
 %define OSZ_DOS_WAIT_TICK   0x0B
+%define OSZ_DOS_GET_ACPI    0x0C
 
 
 ;;  IFS

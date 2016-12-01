@@ -36,10 +36,11 @@ _HEAD:
 	db 0xCB, 0x1A
 	dw _init
 
-
+_rsd_ptr    dd 0
 _rsdt_ptr		dd 0
 _facp_ptr		dd 0
 _dsdt_ptr		dd 0
+_n_entries  dw 0
 
 _SMI_CMD		dw 0
 _ACPI_ENABLE	db 0
@@ -55,11 +56,36 @@ _call_bios:
 _osz_systbl	dd 0
 	ret
 
-_acpi_power:
+_acpi_entry:
+  or ah, ah
+  jz _acpi_get_status
+  cmp ah, 0x01
+  jz _acpi_enum_entry
 	cmp ah, 5
 	jz _to_S5
 	xor ax, ax
 	retf
+
+_acpi_get_status:
+  mov ax, 0x0000
+  mov ebx, [cs:_rsd_ptr]
+  movzx ecx, word [cs:_n_entries]
+  xor edx, edx
+  retf
+
+_acpi_enum_entry:
+  cmp cx, [cs:_n_entries]
+  jae .of
+  xor ax, ax
+  mov es, ax
+  mov ebx, [cs:_rsdt_ptr]
+  movzx ecx, cx
+  mov ebx, [es:ebx+36+ecx*4]
+  retf
+.of:
+  stc
+  sbb ax, ax
+  retf
 
 _to_S5:
 	mov dx, [cs:_PM1a_CONTROL]
@@ -118,6 +144,10 @@ _find_rsdptr:
 ;	mov es, dx
 	mov eax, [es:0x10]
 	mov [_rsdt_ptr], eax
+  mov bx, es
+  movzx ebx, bx
+  shl ebx, 4
+  mov [_rsd_ptr], ebx
 
 _find_facp:
 	mov esi, [_rsdt_ptr]
@@ -126,6 +156,7 @@ _find_facp:
 	add esi, edx
 	sub ecx, edx
 	shr ecx, 2
+  mov [_n_entries], cx
 .loop:
 	a32 fs lodsd
 	cmp dword [fs:eax], 'FACP'
@@ -231,7 +262,7 @@ _find_s5:
 	out dx, al
 
 	les bx, [_osz_systbl]
-	mov [es:bx+OSZ_SYSTBL_ACPI], word _acpi_power
+	mov [es:bx+OSZ_SYSTBL_ACPI], word _acpi_entry
 	mov [es:bx+OSZ_SYSTBL_ACPI+2], cs
 
 	mov ax, (_END_RESIDENT-_HEAD)/16
