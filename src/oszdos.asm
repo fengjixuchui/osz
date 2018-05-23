@@ -1201,15 +1201,6 @@ _loop:
 
 
 _cmd_exit:
-
-	les bx, [_osz_systbl]
-	mov ax, [es:bx+OSZ_SYSTBL_ACPI]
-	or ax, ax
-	jz .no_acpi
-	mov ah, 5
-	call far [es:bx+OSZ_SYSTBL_ACPI]
-.no_acpi:
-
 	mov ax, BIOS_POWER * 0x100
 	call _call_bios
 	ret

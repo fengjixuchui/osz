@@ -222,35 +222,6 @@ _DETECT_CPUID:
 
 .end_cpu:
 
-_setup_unreal:
-	cmp byte [es:di], 3
-	jb .no_unreal
-	cli
-	lgdt [es:__GDT]
-	mov eax, cr0
-	or	eax, byte 1
-	mov cr0, eax
-	db 0xEB, 0x00
-
-	mov ax, 0x08
-	mov ds, ax
-	mov es, ax
-	mov fs, ax
-	mov gs, ax
-;	mov ss, ax
-
-	mov eax, cr0
-	and eax, byte -2
-	mov cr0, eax
-	db 0xEB, 0x00
-
-	push cs
-	pop ds
-	xor ax, ax
-	mov fs, ax
-	mov gs, ax
-.no_unreal:
-
 	mov dx, (ORG_BASE + _END_RESIDENT - _HEAD)/16
 	mov es, dx
 
@@ -259,11 +230,5 @@ _setup_unreal:
 
 	retf
 
-	;;	GDT
-alignb 16
-__GDT:
-	dw (__end_GDT-__GDT-1),__GDT ,0x0000,0x0000 ; 00 NULL
-	dw 0xFFFF,0x0000,0x9200,0x00CF	; 08 32bit KERNEL DATA FLAT
-__end_GDT:
-
+	alignb 16
 _END:

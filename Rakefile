@@ -219,7 +219,7 @@ namespace :osz do
 
   # kernel
   locore = make_mod('osz2boot')
-  mods = %w(oszbio oszn98 oszacpi fat12 oszdos).collect {|t| make_mod(t) }
+  mods = %w(oszbio oszn98 fat12 oszdos).collect {|t| make_mod(t) }
   init_files = %w().collect {|t| make_app(t) }
   make_kernel PATH_OS_SYS, locore, mods, init_files
 
