@@ -15,15 +15,15 @@
 	;ret
 
 _beep:
-	mov ah, OSZ_DOS_BEEP
+	mov ah, OSZ_BEEP
 	call bp
 
-	mov ah, OSZ_DOS_WAIT_TICK
+	mov ah, OSZ_SLEEP
 	mov cx, 200
 	call bp
 
 	xor cx, cx
-	mov ah, OSZ_DOS_BEEP
+	mov ah, OSZ_BEEP
 	call bp
 	ret
 

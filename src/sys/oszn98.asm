@@ -1,8 +1,7 @@
-;;	-*- coding: utf-8 -*-
 ;;
 ;;	OSZ - BIOS for NEC PC-9800 Series Personal Computer
 ;;
-;;	Copyright (c) 2014,2015 MEG-OS project
+;;	Copyright (c) MEG-OS project
 ;;	All rights reserved.
 ;;
 ;;	Redistribution and use in source and binary forms, with or without modification,
@@ -27,28 +26,29 @@
 ;;	SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;
 
+%include "oszbio.inc"
 %include "osz.inc"
 
 
-%define	PORT_PIC0_OCW	0x0000
-%define	PORT_PIC0_IMR	0x0002
-%define	PORT_PIC0_ISR	PORT_PIC0_OCW
-%define	PORT_PIC0_ICW1	PORT_PIC0_OCW
-%define	PORT_PIC0_ICW2	PORT_PIC0_IMR
-%define	PORT_PIC1_OCW	0x0008
-%define	PORT_PIC1_IMR	0x000A
-%define	PORT_PIC1_ISR	PORT_PIC1_OCW
-%define	PORT_PIC1_ICW1	PORT_PIC1_OCW
-%define	PORT_PIC1_ICW2	PORT_PIC1_IMR
-%define	PORT_TIMER_CNT0	0x0071
-%define	PORT_BEEP_CNT	0x0073
-%define	PORT_TIMER_CTL	0x0077
+%define	PORT_PIC0_OCW		0x0000
+%define	PORT_PIC0_IMR		0x0002
+%define	PORT_PIC0_ISR		PORT_PIC0_OCW
+%define	PORT_PIC0_ICW1		PORT_PIC0_OCW
+%define	PORT_PIC0_ICW2		PORT_PIC0_IMR
+%define	PORT_PIC1_OCW		0x0008
+%define	PORT_PIC1_IMR		0x000A
+%define	PORT_PIC1_ISR		PORT_PIC1_OCW
+%define	PORT_PIC1_ICW1		PORT_PIC1_OCW
+%define	PORT_PIC1_ICW2		PORT_PIC1_IMR
+%define	PORT_TIMER_CNT0		0x0071
+%define	PORT_BEEP_CNT		0x0073
+%define	PORT_TIMER_CTL		0x0077
 
-%define	_TIMER_INIT_CNT0		00110100b
-%define	_TIMER_TICK		24576
-%define	_TIMER_RES		10
+%define	_TIMER_INIT_CNT0	00110100b
+%define	_TIMER_TICK			24576
+%define	_TIMER_RES			10
 
-%define	TIMER_INIT_BEEP	10110110b
+%define	TIMER_INIT_BEEP		10110110b
 %define	_BEEP_TICK_L		0x8000
 %define	_BEEP_TICK_H		0x0025
 
@@ -65,8 +65,12 @@ saved_imr	dw 0
 tick_count	dd 0
 saved_irq00	dd 0
 
+keydata		dw 0
+
 cons_cursor	dw 0, 0xA000
 cons_scroll	dw 160*24
+
+cons_attr		dw 0xE1
 
 current_fd_c_r:
 current_fd_r	db 0
@@ -77,39 +81,25 @@ current_sector_byte	dw 0
 current_sector_para	dw 0
 
 
+	alignb 16
+spchrtbl:
+	resb (spchrtbl+0x39-$)
+	db 0x7F, CHAR_CURSOR_UP, CHAR_CURSOR_LEFT, CHAR_CURSOR_RIGHT, CHAR_CURSOR_DOWN
+	resb (spchrtbl+128-$)
+
 _bios_table:
 	dw _bios_const
 	dw _bios_conin
 	dw _bios_conout
 	dw _bios_cls
 	dw _bios_power
-	dw _bios_dispose
 	dw _bios_init_disk
+	dw _bios_fd_status
 	dw _bios_fd_read
 	dw _bios_fd_write
 	dw _bios_beep
 	dw _bios_tick
-	dw _bios_fd_status
-
-
-__irq00:
-	push ax
-	mov al, 0x60
-	out PORT_PIC0_OCW, al
-
-	inc word [cs:tick_count]
-	jnz .no_overflow
-	inc word [cs:tick_count+2]
-.no_overflow:
-
-	pop ax
-	iret
-
-
-__int28:
-	sti
-	hlt
-	iret
+	dw _bios_rtc
 
 
 _bios_entry:
@@ -142,31 +132,70 @@ _retf:
 	retf
 
 
-_bios_const:
-	mov ah, 0x01
-	int 0x18
-	or bh, bh
-	jz short .empty
-	mov al, 0xFF
-	ret
-.empty:
-	xor ax, ax
-	ret
+__irq00:
+	push ax
+	mov al, 0x60
+	out PORT_PIC0_OCW, al
+
+	inc word [cs:tick_count]
+	jnz .no_overflow
+	inc word [cs:tick_count+2]
+.no_overflow:
+
+	pop ax
+	iret
 
 
 _bios_conin:
-.loop:
+	call _bios_const
+	xor ax, ax
+	xchg ax, [cs:keydata]
+	xor ah, ah
+	ret
+
+_bios_const:
+	mov ax, [cs:keydata]
+	or ax, ax
+	jnz short .has_key
+	call _update_keydata
+	mov [cs:keydata], ax
+	or ax, ax
+	jnz short .has_key
+	ret
+.has_key:
+	mov al, 0xFF
+	ret
+
+_update_keydata:
 	mov ah, 0x01
 	int 0x18
 	or bh, bh
-	jz short .wait
+	jnz short .has_key
+	xor ax, ax
+	ret
+.has_key:
 	xor ah, ah
 	int 0x18
-	xor ah, ah
+	or al, al
+	jz short .special_keys
 	ret
-.wait:
-	int 0x28
-	jmp short .loop
+.special_keys:
+	cmp ah, 0x39
+	jnz short .no_del
+	; ctrl-alt-del
+	xor cx, cx
+	mov ds, cx
+	mov al, [0x053A]
+	and al, 0x19 ; mask CTRL ALT SHIFT
+	cmp al, 0x18 ; CTRL ALT
+	jnz short .no_ctrlaltdel
+	jmp _bios_reset
+.no_ctrlaltdel:
+.no_del:
+	mov al, ah
+	mov bx, spchrtbl
+	cs xlat
+	ret
 
 
 _bios_conout:
@@ -190,6 +219,8 @@ _bios_conout:
 .no_5C:
 	xor ah, ah
 	stosw
+	mov al, [cs:cons_attr]
+	mov [es:di+0x1FFE], al
 	jmp short .end
 .bs:
 	mov ax, di
@@ -224,6 +255,7 @@ _bios_conout:
 	mov di, ax
 	;jmp short .end
 .end:
+	call _check_scroll
 	mov [cs:cons_cursor], di
 	mov dx, di
 	mov ah, 0x13
@@ -245,10 +277,23 @@ _check_scroll:
 	mov cx, [cs:cons_scroll]
 	sub cx, si
 	shr cx, 1
+	push cx
+	push si
 	rep movsw
 	mov ax, 0x0020
 	mov cx, 80
 	rep stosw
+	mov dx, di
+	pop si
+	pop cx
+	mov di, 0x2000
+	add si, di
+	rep movsw
+	mov al, [cs:cons_attr]
+	xor ah, ah
+	mov cx, 80
+	rep stosw
+	mov di, dx
 	pop ds
 	pop ax
 	sub di, 160
@@ -269,6 +314,8 @@ _bios_cls:
 
 
 _bios_power:
+	cmp al, 0x01
+	jz _bios_reset
 	push cs
 	pop ds
 
@@ -285,6 +332,7 @@ _bios_power:
 
 	;;	TODO: APM Shutdown
 
+_bios_reset:
 	;;	REBOOT
 	mov al, 0x0F
 	out 0x37, al
@@ -296,17 +344,6 @@ _bios_power:
 forever:
 	hlt
 	jmp forever
-
-
-
-_bios_dispose:
-	cli
-	mov al, [cs:saved_imr]
-	out 0x02, al
-	mov al, [cs:saved_imr+1]
-	out 0x0A, al
-	;; TODO:
-	ret
 
 
 _bios_init_disk:
@@ -437,8 +474,7 @@ _bios_fd_status:
 _bios_beep:
 	pushf
 	cli
-	or cx, cx
-	jz short .stop
+	jcxz .stop
 	cmp cx, 0x0001
 	jz short .fire
 	mov al, TIMER_INIT_BEEP
@@ -472,6 +508,26 @@ _bios_tick:
 	ret
 
 
+_bios_rtc:
+	push ds
+	pop es
+	mov bx, dx
+	xor al, al
+	mov [bx], al
+	inc bx
+	xor ah, ah
+	int 0x1C
+	mov al, [bx+1]
+	mov cl, 4
+	shr al, cl
+	cmp al, 10
+	jb .dontfix
+	add al, 6
+.dontfix:
+	mov [bx+1], al
+	ret
+
+
 np2_shutdown_cmd db "poweroff", 0
 
 	alignb 16
@@ -481,7 +537,7 @@ _END_RESIDENT:
 
 _init:
 	; installation check
-	or al, al
+	cmp al, OSZ_ARCH_NEC98
 	jnz .dont_install
 	or dx, dx
 	jz .install_ok
@@ -521,11 +577,6 @@ _init:
 	stosw
 	mov ax, cs
 	stosw
-	mov di, 0x28*4
-	mov ax, __int28
-	stosw
-	mov ax, cs
-	stosw
 
 	; mem lower
 	mov al, [es:0x0501]
@@ -534,16 +585,6 @@ _init:
 	mov cl, 13
 	shl ax, cl
 	mov [es:bx + OSZ_SYSTBL_MEMSZ], ax
-
-	; mem middle
-	cmp [es:bx + OSZ_SYSTBL_CPUID], byte 2
-	jb .no_extmem
-	mov al, [es:0x0401]
-	xor ah, ah
-	mov cl, 7
-	shl ax, cl
-	mov [es:bx + OSZ_SYSTBL_MEMPROT], ax
-.no_extmem:
 
 %if 0
 	; setup 640x480

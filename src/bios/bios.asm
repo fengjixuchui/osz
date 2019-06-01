@@ -1,7 +1,7 @@
 ;;
-;;	MBR for TinyFDISK
+;;	BIOS for IBM PC Compatible
 ;;
-;;	Copyright (c) 1998-2013, MEG-OS project
+;;	Copyright (c) MEG-OS project
 ;;	All rights reserved.
 ;;
 ;;	Redistribution and use in source and binary forms, with or without modification,
@@ -26,104 +26,72 @@
 ;;	SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;
 
-%define	CS_BASE	0x0600
-%define	MBR_PT	CS_BASE+0x1BE
+
 
 [BITS 16]
-[org CS_BASE]
+[ORG 0]
 
-start:
-	cld
-	xor ax, ax
-	mov ss, ax
-	mov sp, 0x7C00
-	mov ds, ax
-	mov es, ax
-	mov si, sp
-	mov di, CS_BASE
-	mov cx, 0x200
-	rep movsb
-	jmp 0x0000:next
-next:
 
-	;;	Search bootable partition
-	mov bp, MBR_PT
+_aux_out:
+    push ds
+    push dx
+    xor dx, dx
+    mov ds, dx
+    mov dx, [ds:0x400]
+    out dx, al
+    pop dx
+    pop ds
+    ret
+
+_aux_in:
+    push ds
+    push dx
+    xor dx, dx
+    mov ds, dx
+    mov dx, [ds:0x400]
+    in al, dx
+    pop dx
+    pop ds
+    ret
+
+_aux_in_st:
+    ret
+
+
+_INIT:
+    cli
+    cld
+    xor ax, ax
+    mov ss, ax
+    mov sp, 0x400
+    mov ax, cs
+    mov ds, ax
+    mov es, ax
+
+    mov ax, 0x3F8
+    mov [ss:0x400], ax
+
+    mov si, banner
 .loop:
-	cmp [bp], al
-	js boot
-	lea bp, [bp+0x10]
-	cmp bp, CS_BASE+0x1FE
-	jc .loop
-	mov si, nosystem_msg
-halt:
-	call _puts
-forever:
-	sti
-	hlt
-	jmp short forever
-
-	;;	load then boot
-boot:
-	mov [bp], dl
-
-	;;	LBA Enabled?
-	mov bx, 0x55AA
-	mov ah, 0x41
-	int 0x13
-	jc short .no_lba
-	cmp bx, 0xAA55
-	jnz short .no_lba
-	test cx, 0x01
-	jz short .no_lba
-
-.load_mbr:
-	push ss
-	push ss
-	push dword [bp+8]
-	push ds
-	push word 0x7C00
-	push byte 0x0001
-	push byte 0x0010
-	mov si, sp
-	mov ah, 0x42
-	int 0x13
-	pushf
-	add sp, 0x10
-	popf
-	jc .boot_ng
-.boot_ok:
-	mov si, bp
-	mov dl, [si]
-	jmp 0x0000:0x7C00
-
-.no_lba:
-	mov dh, [bp+1]
-	mov cx, [bp+2]
-	mov bx, 0x7C00
-	mov ax, 0x0201
-	int 0x13
-	jnc .boot_ok
-.boot_ng:
-	mov si, diskerror_msg
-	jmp short halt
-
-
-
-
-_puts:
-.loop:
-	lodsb
-	or al, al
-	jz .end
-	mov ah, 0x0E
-	int 0x10
-	jmp short .loop
+    lodsb
+    or al, al
+    jz .end
+    mov dx, 0x3F8
+    out dx, al
+    jmp .loop
 .end:
-	ret
+
+_forever:
+    cli
+    hlt
+    jmp _forever
 
 
-nosystem_msg:
-	db "Missing OS", 0
-diskerror_msg:
-	db "Disk I/O Error", 0
+banner  db "Hello world", 13, 10, 0
 
+	times 0xFFF0 - ($-$$) db 0
+
+__RESET:
+    jmp 0xF000:_INIT
+
+	times 0x10000 - ($-$$) db 0

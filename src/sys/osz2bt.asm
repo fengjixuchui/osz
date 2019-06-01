@@ -1,8 +1,7 @@
-;;	-*- coding: utf-8 -*-
 ;;
-;;	MEG-OS Z - lcoore (Second boot loader)
+;;	MEG-OS Zero Second boot loader
 ;;
-;;	Copyright (c) 1998-2016 MEG-OS project
+;;	Copyright (c) 2014-2017 MEG-OS project
 ;;	All rights reserved.
 ;;
 ;;	Redistribution and use in source and binary forms, with or without modification,
@@ -27,33 +26,31 @@
 ;;	SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;
 
+%include "oszbio.inc"
 %include "osz.inc"
 
 ; 0x0201 = 1.2
 %define	VER_MAJ_MIN		0x0000
-%define	VER_REVISION	0x0007
+%define	VER_REVISION	0x0008
 %define	IPL_SIGN		0x1eaf
 
 %define	ORG_BASE		0x0800
-%define	_osz_systbl		0x0600
+%define	_osz_systbl		0x0700
 
 
-[bits 16]
-[org ORG_BASE]
+[BITS 16]
+[ORG ORG_BASE]
 
 _HEAD:
 	db "EM"
 	jmp short _legacy_entry
+
 file_size	dw 0
 offset_data	dw 0
 offset_ramd	dw 0
 size_ramd	dw 0 ;
 
-_legacy_entry:
-	xor ax, IPL_SIGN
-	jz short _crt
-forever:
-	jmp short forever
+	db 0x7F, "OSZ"
 
 _next:
 
@@ -99,6 +96,11 @@ _invoke:
 	alignb 16
 _END_RESIDENT:
 
+_legacy_entry:
+	xor ax, IPL_SIGN
+	jz short _crt
+forever:
+	jmp short forever
 
 _crt:
 	cli
@@ -151,14 +153,16 @@ _crt:
 
 	; DETECT CPU
 _DETECT_CPUID:
-	mov di, _osz_systbl + OSZ_SYSTBL_CPUID
+	xor di, di
 
+	; 186?
 	mov cx, 0x0121
 	shl ch, cl
-	jnz short .no8086
-	jmp .end_cpu
-.no8086
-	mov dx, 0xF000
+	jz short .end_cpu
+	inc di
+
+	; 286?
+	mov dx,0xF000
 	pushf
 	pop ax
 	mov cx, ax
@@ -167,34 +171,35 @@ _DETECT_CPUID:
 	popf
 	pushf
 	pop ax
-	and ax, dx
-	cmp ax, dx
-	jnz .ov286
-	mov byte [es:di], 1
-	jmp short .end_cpu
-.ov286:
+	and ax,dx
+	cmp ax,dx
+	jz short .end_cpu
+	inc di
 
-	or cx, dx
+	; 386?
+	or cx,dx
 	push cx
 	popf
 	pushf
 	pop ax
-	and ax, dx
-	mov byte [es:di], 2
+	and ax,dx
 	jz short .end_cpu
+	inc di
 
+	; 486?
 	pushfd
 	pop eax
 	mov ecx, eax
 	xor eax, 0x00040000
 	push eax
 	popfd
-	xor eax,ecx
-	mov byte [es:di], 3
-	jz short .end_cpu
-	push ecx
-	popfd
+	pushfd
+	pop eax
+	cmp eax, ecx
+	jz .end_cpu
+	inc di
 
+	; cpuid?
 	mov eax, ecx
 	xor eax, 0x00200000
 	push eax
@@ -202,25 +207,54 @@ _DETECT_CPUID:
 	pushfd
 	pop eax
 	xor eax, ecx
-	mov byte [es:di], 4
-	jz short .env_no_cpuid
+	jz .end_cpu
+	inc di
 
-	mov byte [es:di], 5
-
+	; amd64?
 	mov eax, 0x80000000
 	cpuid
 	cmp eax, 0x80000000
-	jbe .env_no_cpuid80000000
+	jbe .env_no_amd64
 	mov eax, 0x80000001
 	cpuid
 	bt edx, 29
 	jnc short .env_no_amd64
-	mov byte [es:di], 6
-.env_no_amd64:
-.env_no_cpuid80000000:
-.env_no_cpuid:
+	inc di
 
+.env_no_amd64:
 .end_cpu:
+	mov ax, di
+	mov di, _osz_systbl + OSZ_SYSTBL_CPUID
+	mov [es:di], al
+
+_setup_unreal:
+	cmp byte [es:di], 3
+	jb .no_unreal
+	cli
+	lgdt [es:__GDT]
+	mov eax, cr0
+	or	eax, byte 1
+	mov cr0, eax
+	db 0xEB, 0x00
+
+	mov ax, 0x08
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+;	mov ss, ax
+
+	mov eax, cr0
+	and eax, byte -2
+	mov cr0, eax
+	db 0xEB, 0x00
+
+	push cs
+	pop ds
+	xor ax, ax
+	mov fs, ax
+	mov gs, ax
+.no_unreal:
 
 	mov dx, (ORG_BASE + _END_RESIDENT - _HEAD)/16
 	mov es, dx
@@ -230,5 +264,12 @@ _DETECT_CPUID:
 
 	retf
 
-	alignb 16
+
+	;;	GDT
+alignb 16
+__GDT:
+	dw (__end_GDT-__GDT-1),__GDT ,0x0000,0x0000 ; 00 NULL
+	dw 0xFFFF,0x0000,0x9200,0x00CF	; 08 32bit KERNEL DATA FLAT
+__end_GDT:
+
 _END:
